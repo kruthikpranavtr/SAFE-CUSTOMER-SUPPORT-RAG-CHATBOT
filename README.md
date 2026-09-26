@@ -1,0 +1,269 @@
+# Safe Customer Support RAG Chatbot
+
+An AI-powered, evidence-based customer support web application designed to reduce **overreliance on AI**, **automation bias**, **anthropomorphization**, and **unsupported/hallucinated answers** using Retrieval-Augmented Generation (RAG) and behavioral testing.
+
+---
+
+## 1. Project Title & Overview
+**Application Name:** Safe Customer Support RAG Chatbot  
+**Identity:** AI Customer Support Assistant  
+**Primary Mission:** Answering customer questions strictly from verified company documentation, communicating explicit confidence levels, citing supporting document excerpts, providing user verification warnings, and running controlled behavioral user studies to measure error detection rates.
+
+---
+
+## 2. Problem Statement
+When modern customer support chatbots provide confident-sounding responses, users are prone to:
+1. **Overreliance on AI:** Assuming automated outputs are always accurate and neglecting manual verification.
+2. **Automation Bias:** Blindly accepting algorithmic outputs even in the presence of contradictory evidence.
+3. **Anthropomorphization:** Trusting the chatbot as if it were a human employee with personal knowledge and accountability.
+4. **Hallucination & Fabrication:** Generating plausible-sounding but completely fabricated company policies (e.g., claiming a 30-day return policy when the actual company policy strictly enforces 7 days).
+
+---
+
+## 3. Objectives
+- Provide accurate, factually grounded answers to customer questions using an enterprise RAG pipeline.
+- Implement explicit **Source Attribution** with page numbers and text snippets viewable in real-time.
+- Calibrate and communicate **Uncertainty** across 4 levels: *High*, *Moderate*, *Low*, and *Unable to determine*.
+- Prevent policy fabrication by safely refusing queries unsupported by company documents.
+- Clearly present the assistant as non-human (*"AI Customer Support Assistant"*).
+- Include an integrated **User Study Module** with injected errors to measure user error detection rates.
+- Present real-time telemetry through an interactive **Admin Dashboard**.
+
+---
+
+## 4. Technologies Used
+
+### Frontend
+- **React 18** (TypeScript)
+- **Vite 5** (Fast development server and bundling)
+- **Tailwind CSS 3** (Responsive, professional SaaS layout)
+- **Lucide React** (Consistent iconography)
+
+### Backend
+- **Python 3.12**
+- **FastAPI** (High-performance asynchronous REST API)
+- **Uvicorn** (ASGI server)
+- **Pydantic v2 & Pydantic-Settings** (Data validation & schemas)
+
+### RAG & Vector Database
+- **ChromaDB** (Local persistent vector database)
+- **Modular Embedding System** (Hybrid TF-IDF subword vectorizer with zero external network dependencies, plus support for OpenAI/Sentence-Transformers)
+- **Multi-format Document Parsers** (`pypdf`, `python-docx`, plain text)
+- **Modular LLM Integration** (Local grounded synthesizer with zero external dependencies, plus plug-and-play support for Google Gemini and OpenAI)
+
+### Database
+- **SQLite** (`data/app.db`) for chat sessions, messages, documents, feedback, and user study results.
+
+---
+
+## 5. System Architecture & RAG Pipeline
+
+```
+                                  +-----------------------------+
+                                  |   Customer / Evaluator UI   |
+                                  | (React + Vite + TypeScript) |
+                                  +--------------+--------------+
+                                                 |
+                                     HTTP REST / JSON
+                                                 |
+                                  +--------------v--------------+
+                                  |     FastAPI Backend API     |
+                                  +--------------+--------------+
+                                                 |
+             +-----------------------------------+-----------------------------------+
+             |                                   |                                   |
++------------v------------+         +------------v------------+         +------------v------------+
+|  Document Preprocessor  |         |   Hybrid Vector Store   |         |      Relational DB      |
+|  - Text Extraction      |         |   - ChromaDB Collection |         |      - SQLite           |
+|  - Sliding-Window Chunk |         |   - Subword Embeddings  |         |      - Sessions & Logs  |
+|  - Page Metadata        |         |   - BM25 Re-Ranking     |         |      - User Study Data  |
++-------------------------+         +------------+------------+         +-------------------------+
+                                                 |
+                                    +------------v------------+
+                                    |   Confidence Evaluator  |
+                                    |   - Lexical & Semantic  |
+                                    |   - Domain Verification |
+                                    +------------+------------+
+                                                 |
+                                    +------------v------------+
+                                    |   Grounded Synthesizer  |
+                                    |   - Local / Gemini / OAI|
+                                    |   - Citation Formatting |
+                                    +-------------------------+
+```
+
+### RAG Execution Steps:
+1. **Document Ingestion:** Admin uploads PDF, TXT, or DOCX documents to `data/documents/`.
+2. **Chunking & Metadata:** Documents are split into 800-character overlapping chunks, preserving document name, chunk ID, and page number.
+3. **ChromaDB Indexing:** Text chunks are vectorized and indexed into the ChromaDB collection `technova_support_knowledgebase`.
+4. **Retrieval & Re-ranking:** Customer questions query ChromaDB with hybrid cosine similarity and keyword coverage re-ranking.
+5. **Confidence & Domain Check:**
+   - If key distinctive terms are absent from the entire documentation corpus, confidence is set to **"Unable to determine"** and safe refusal is triggered.
+   - If evidence is strongly corroborated, confidence is set to **High** or **Moderate**.
+6. **Answer Synthesis:** Formulates factual answers with exact citations and displays verification alerts.
+
+---
+
+## 6. Database Schema (SQLite)
+
+- **`users`**: User identity and customer role.
+- **`chat_sessions`**: Conversation threads, titles, and timestamps.
+- **`messages`**: Chat history, message role (`user`/`assistant`), content, confidence, serialized sources, and retrieval scores.
+- **`documents`**: Tracked knowledge base files, upload dates, chunk counts, and indexing status.
+- **`feedback`**: User feedback ratings (`helpful`, `unhelpful`), category reasons (`incorrect_info`, `unsupported_source`, `unclear`, `missing_info`), and user comments.
+- **`study_sessions`**: User-study evaluation sessions and completion progress.
+- **`study_responses`**: Participant decisions on injected-error scenarios, tracking correctness, response time in milliseconds, and whether sources were viewed.
+
+---
+
+## 7. Safety Mechanisms & Bias Mitigation
+
+| Mechanism | Implementation | Purpose |
+| :--- | :--- | :--- |
+| **Automation Bias Warning** | Persistent amber banner and per-message notice: *"AI answers may contain errors. Check cited sources before making important decisions."* | Encourages manual verification rather than passive acceptance. |
+| **De-anthropomorphization** | Strictly labeled as **"AI Customer Support Assistant"** with bot avatars. Forbids human names, human portraits, and personal emotions. | Mitigates emotional trust and synthetic human bonding. |
+| **Source Citation & Inspection** | Every AI response renders clickable document badges (`[View Source]`) opening the raw chunk excerpt with similarity score. | Allows instant verification against source text. |
+| **Non-Fabrication Policy** | Queries lacking sufficient documentation return: *"Sorry, I couldn't find sufficient information about that in the available company documents."* | Prevents hallucinating fictional policies. |
+| **Uncertainty Calibration** | Dynamic confidence badges: *High* (Emerald), *Moderate* (Amber), *Low* (Orange), *Unable to determine* (Rose). | Clearly bounds the certainty of each generated response. |
+
+---
+
+## 8. User Study Methodology & Metrics
+
+The built-in **User Study Module** (`/study`) tests whether users can catch errors in AI customer support answers:
+1. Participants review controlled customer support scenarios.
+2. Scenarios include:
+   - **Supported Answers:** Answers that accurately match company policy.
+   - **Injected Errors:** Plausible-sounding answers that deliberately contradict company policy (e.g. claiming a 30-day refund window when policy mandates 7 days).
+   - **Insufficient Information:** Answers acknowledging lack of policy coverage.
+3. Participants choose between:
+   - *1. Answer is supported*
+   - *2. Answer contains an error*
+   - *3. Not enough information*
+4. Telemetry records:
+   - **Error Catch Rate (%):** `(Correctly detected injected errors / Total injected-error scenarios) × 100`
+   - **Response Time (ms):** Time taken by user to evaluate the scenario.
+   - **Source View Rate (%):** Frequency with which participants opened the supporting document before submitting their decision.
+   - **False Alarm Rate:** Number of times a supported response was incorrectly marked as an error.
+
+---
+
+## 9. Installation & Running Instructions
+
+### Prerequisites
+- Python 3.10+ (Python 3.12 recommended)
+- Node.js 18+ & npm
+
+### Backend Setup
+1. Open a terminal in the project directory:
+   ```bash
+   cd "/home/techpark-4/project2/SAFE CUSTOMER SUPPORT RAG CHATBOT"
+   ```
+2. Activate the virtual environment:
+   ```bash
+   source venv/bin/activate
+   ```
+3. Install backend dependencies (already installed in venv):
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Start the FastAPI backend server:
+   ```bash
+   uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+   The backend API will run at: `http://localhost:8000`  
+   Interactive API docs (Swagger UI): `http://localhost:8000/docs`
+
+### Frontend Setup
+1. In a second terminal, navigate to the frontend:
+   ```bash
+   cd "/home/techpark-4/project2/SAFE CUSTOMER SUPPORT RAG CHATBOT/frontend"
+   ```
+2. Install frontend dependencies (if not already installed):
+   ```bash
+   npm install
+   ```
+3. Start the Vite development server:
+   ```bash
+   npm run dev
+   ```
+   The web application will run at: `http://localhost:5173`
+
+---
+
+## 10. Environment Configuration (`.env`)
+
+Configure the backend via `.env` or system environment variables:
+
+```ini
+# Storage paths
+DATABASE_PATH="./data/app.db"
+VECTOR_DB_PATH="./data/vectorstore"
+DOCUMENTS_DIR="./data/documents"
+
+# LLM Provider: "local" (default offline synthesizer), "gemini", or "openai"
+LLM_PROVIDER="local"
+
+# Optional External API Keys:
+GEMINI_API_KEY=""
+OPENAI_API_KEY=""
+LLM_MODEL="gpt-4o-mini"
+
+# Safety & Retrieval Settings
+TOP_K_CHUNKS=4
+SIMILARITY_THRESHOLD_HIGH=0.60
+SIMILARITY_THRESHOLD_MODERATE=0.40
+SIMILARITY_THRESHOLD_LOW=0.20
+```
+
+---
+
+## 11. API Documentation Summary
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/chat` | Submit question, run RAG, calculate confidence, return answer & sources |
+| `GET` | `/api/chat/sessions` | List customer chat sessions |
+| `GET` | `/api/chat/sessions/{id}` | Retrieve messages and sources for a session |
+| `DELETE` | `/api/chat/sessions/{id}` | Delete a chat session |
+| `GET` | `/api/documents` | List uploaded documents with status and chunk counts |
+| `POST` | `/api/documents/upload` | Upload PDF/TXT/DOCX, extract text, chunk and index in ChromaDB |
+| `DELETE` | `/api/documents/{id}` | Delete document and remove chunk vectors from ChromaDB |
+| `POST` | `/api/documents/reindex` | Re-index all documents in knowledge base |
+| `GET` | `/api/documents/{id}/chunks`| Inspect text chunks of a specific document |
+| `GET` | `/api/sources/{id}` | Inspect raw chunk text and metadata by chunk ID |
+| `POST` | `/api/feedback` | Submit helpful/unhelpful rating and detailed error reasons |
+| `POST` | `/api/study/start` | Initialize a controlled user-study session |
+| `POST` | `/api/study/response` | Record participant decision, time, and source view status |
+| `GET` | `/api/study/results` | Compute aggregate study metrics (Error Catch Rate, etc.) |
+| `GET` | `/api/dashboard` | Retrieve overall telemetry for Admin Dashboard |
+| `GET` | `/api/health` | Service health status |
+
+---
+
+## 12. Automated Testing
+Run the complete test suite:
+```bash
+source venv/bin/activate
+pytest tests/test_backend.py -v
+```
+
+All 7 test suites verify:
+- Health check & ChromaDB connectivity
+- Sample document indexing & retrieval
+- Accurate source citation for supported questions
+- Hallucination refusal for unsupported queries
+- Detailed feedback submissions
+- User study response tracking & Error Catch Rate calculations
+- Admin dashboard telemetry aggregations
+
+---
+
+## 13. Preloaded Sample Company Documents
+The system automatically includes and indexes 6 fictional demo policy documents:
+1. `Refund Policy.txt` (Return eligibility, 7-day window, restocking fees)
+2. `Shipping Policy.txt` (Ground, express, overnight timelines, international shipping)
+3. `Product FAQ.txt` (NovaBook specifications, Torx T5 RAM upgrades, battery GaN charger)
+4. `Warranty Policy.txt` (1-year manufacturer warranty, 90-day refurbished warranty, exclusions)
+5. `Order Cancellation Policy.txt` (60-minute cancellation window, in-transit rules)
+6. `Customer Support FAQ.txt` (Support channels, password reset, warehouse visitation notice)

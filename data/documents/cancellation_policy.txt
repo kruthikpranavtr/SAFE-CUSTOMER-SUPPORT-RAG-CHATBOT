@@ -1,0 +1,20 @@
+[DEMO / FICTIONAL DOCUMENT - TECHNOVA SUPPORT KNOWLEDGE BASE]
+DOCUMENT: Order Cancellation Policy
+DOCUMENT ID: POL-CAN-2024-V1
+LAST UPDATED: February 15, 2024
+
+SECTION 1: ORDER CANCELLATION WINDOW (Page 1)
+At TechNova, orders move quickly from payment authorization to automated warehouse fulfillment.
+- You may cancel an order free of charge within 60 minutes of order placement directly through your account dashboard or order status link.
+- After 60 minutes, orders are routed to automated robotic picking and packing, at which point cancellations cannot be guaranteed.
+
+SECTION 2: CANCELLATION AFTER FULFILLMENT / TRANSIT (Page 2)
+If your order has already entered the packing queue or has been handed over to the postal carrier:
+- The order cannot be intercepted or cancelled in transit.
+- Once the package arrives at your delivery destination, you may decline the delivery with the carrier (Return to Sender) or initiate a standard return within 7 days of receipt under our Refund Policy.
+- Once returned to our warehouse, a full refund for product costs minus applicable return shipping fees will be processed.
+
+SECTION 3: BACKORDERED AND PRE-ORDER CANCELLATIONS (Page 3)
+For items on backorder or future pre-orders:
+- Customers may cancel anytime prior to the official warehouse dispatch notification without incurring any cancellation or restocking penalty.
+- Refunds for cancelled pre-orders will be returned to the original payment method within 3 to 5 business days.

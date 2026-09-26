@@ -1,0 +1,20 @@
+[DEMO / FICTIONAL DOCUMENT - TECHNOVA SUPPORT KNOWLEDGE BASE]
+DOCUMENT: Customer Support FAQ & Contact Guide
+DOCUMENT ID: FAQ-SUP-2024-V2
+LAST UPDATED: April 5, 2024
+
+SECTION 1: SUPPORT CHANNELS AND OPERATING HOURS (Page 1)
+TechNova provides multiple support avenues to assist you:
+1. Live Web Chat: Available 24 hours a day, 7 days a week via our AI Assistant and human support specialists.
+2. Email Support: Write to support@technova-support-demo.com. Average response time is within 4 business hours.
+3. Phone Support: 1-800-555-NOVA (6682). Available Monday through Friday from 8:00 AM to 8:00 PM EST, and Saturdays 9:00 AM to 5:00 PM EST. Closed Sundays.
+
+SECTION 2: ACCOUNT MANAGEMENT & PASSWORDS (Page 2)
+Q: How do I reset my TechNova account password?
+A: Click "Forgot Password" on the login screen, enter your registered email address, and follow the one-time authentication link sent to your inbox. The link expires after 15 minutes for security.
+
+Q: How can I update my shipping address after placing an order?
+A: If your order was placed within the past 30 minutes, you can edit the address directly in your order confirmation portal. Beyond 30 minutes, please contact live support immediately so an agent can attempt manual address correction before carrier dispatch.
+
+SECTION 3: PET / STORE VISITATION POLICY (Page 3)
+Notice: TechNova does not operate walk-in retail stores. All operations, distribution centers, and warehouses are private industrial logistics facilities not open to the general public or pets.
