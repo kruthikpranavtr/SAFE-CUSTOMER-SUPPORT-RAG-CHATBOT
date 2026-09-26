@@ -260,10 +260,29 @@ All 7 test suites verify:
 ---
 
 ## 13. Preloaded Sample Company Documents
-The system automatically includes and indexes 6 fictional demo policy documents:
-1. `Refund Policy.txt` (Return eligibility, 7-day window, restocking fees)
-2. `Shipping Policy.txt` (Ground, express, overnight timelines, international shipping)
-3. `Product FAQ.txt` (NovaBook specifications, Torx T5 RAM upgrades, battery GaN charger)
-4. `Warranty Policy.txt` (1-year manufacturer warranty, 90-day refurbished warranty, exclusions)
-5. `Order Cancellation Policy.txt` (60-minute cancellation window, in-transit rules)
-6. `Customer Support FAQ.txt` (Support channels, password reset, warehouse visitation notice)
+The system automatically includes, parses, and indexes 7 multi-page PDF company documents:
+1. `Refund Policy.pdf` (Return eligibility, 7-day window, restocking fees, condition guidelines)
+2. `Shipping Policy.pdf` (Ground, express, overnight timelines, $50 free shipping threshold, international delivery)
+3. `Product Information.pdf` (NovaBook specifications, Torx T5 RAM upgrades, battery GaN charger, display specs)
+4. `Warranty Policy.pdf` (1-year manufacturer warranty, 90-day refurbished warranty, exclusions)
+5. `Cancellation Policy.pdf` (60-minute cancellation window, in-transit cancellation rules, fees)
+6. `Customer FAQ.pdf` (Support channels, password reset, warehouse visitation notice, account management)
+7. `Return Policy.pdf` (RMA authorization, inspection procedures, return packaging instructions)
+
+---
+
+## 14. Phased Implementation Progress & Verification Tracker
+
+| Phase | Description | Key Deliverables & Implemented Features | Status |
+| :--- | :--- | :--- | :---: |
+| **Phase 0** | **Project Inspection & Planning** | Architecture audit, project directory inspection, dependency validation (`requirements.txt`, `package.json`), environment template (`.env.example`), and development roadmap. | `VERIFIED` |
+| **Phase 1** | **Basic Full-Stack Application** | FastAPI application setup, SQLite database initialization (`data/app.db`), health check endpoint (`/api/health`), React 18 TypeScript frontend with responsive SaaS layout and navigation. | `VERIFIED` |
+| **Phase 2** | **Document Management & RAG Knowledge Base** | Multi-format parser (PDF, DOCX, TXT, MD), sliding-window text chunker with page attribution, ChromaDB vector store with hybrid subword vectorizer and BM25-style keyword re-ranking, document upload/deletion/reindexing endpoints. | `VERIFIED` |
+| **Phase 3** | **Modular LLM Integration & Grounded Synthesis** | Multi-provider architecture (Local Grounded Synthesizer with zero external dependencies, Google Gemini 1.5 Flash, and OpenAI GPT-4o-mini), context-grounded extractive response synthesis, safe refusal on unindexed queries. | `VERIFIED` |
+| **Phase 4** | **AI Safety, Uncertainty & Transparency** | Calibrated 4-tier confidence engine (*High*, *Moderate*, *Low*, *Unable to determine*), persistent automation-bias warnings, non-human AI identity safeguards, interactive `SourceModal` with similarity scores. | `VERIFIED` |
+| **Phase 5** | **Feedback, Verification & Human Escalation** | Granular user feedback ratings with category tags (`incorrect_info`, `unsupported_source`, etc.), user verification tracking, one-click human escalation with automated conversation summary. | `VERIFIED` |
+| **Phase 6** | **Safety Lab / Controlled Testing Module** | Dedicated evaluation suite with 6 controlled scenarios (accurate policies, injected error edge cases, insufficient information), response time telemetry, and automated Error Catch Rate calculation. | `VERIFIED` |
+| **Phase 7** | **A/B Testing Framework for Safety UI** | Split-testing engine comparing Condition A (standard chatbot baseline) vs. Condition B (safety-enhanced UI with prominent confidence badges and mandatory source reminders), comparative catch rate metrics. | `VERIFIED` |
+| **Phase 8** | **Analytics Dashboard & Risk Register** | Executive telemetry dashboard (session statistics, question counts, satisfaction ratings, A/B performance) and formal AI Safety Risk Matrix monitoring 5 critical failure modes with mitigation tracking. | `VERIFIED` |
+| **Phase 9** | **Advanced Security & Multilingual Support** | `PromptGuard` defense against prompt injections, system prompt leaks, and delimiter breakouts; cross-lingual RAG expansion for Tamil (தமிழ்) with domain-specific keyword translation and synthesized Tamil responses. | `VERIFIED` |
+| **Phase 10** | **End-to-End Verification & Presentation Prep** | Full test suite execution: 10/10 pytest unit tests passing, 18/18 live system integration tests passing with 0 errors, Vite production build verified (`0 errors`), and clean GitHub synchronization. | `VERIFIED` |

@@ -129,9 +129,15 @@ class LLMService:
         """
         Extractive, grounded local answering engine with bilingual synthesis.
         """
-        query_words = set(re.findall(r'\b\w{3,}\b', query.lower()))
-        stop_words = {"what", "when", "where", "which", "does", "have", "with", "from", "about", "your", "their", "this", "that"}
-        key_terms = query_words - stop_words
+        from backend.app.rag.embeddings import STOP_WORDS
+        question_stop_words = STOP_WORDS | {
+            "what", "when", "where", "which", "does", "have", "with", "from", "about", 
+            "your", "their", "this", "that", "how", "long", "many", "much", "can", 
+            "tell", "explain", "give", "show", "know", "please", "technova"
+        }
+        key_terms = [w for w in re.findall(r'\b\w{3,}\b', query.lower()) if w not in question_stop_words]
+        if not key_terms:
+            key_terms = [w for w in re.findall(r'\b\w{3,}\b', query.lower()) if w not in STOP_WORDS]
 
         extracted_sentences = []
         seen = set()
@@ -144,10 +150,18 @@ class LLMService:
                 if len(s_clean) < 15 or s_clean in seen:
                     continue
                 s_words = set(re.findall(r'\b\w{3,}\b', s_clean.lower()))
-                match_count = len(key_terms.intersection(s_words))
+                matched_terms = [
+                    t for t in key_terms
+                    if t in s_words or any(w.startswith(t[:min(len(t), 5)]) or t.startswith(w[:min(len(w), 5)]) for w in s_words)
+                ]
+                match_count = len(matched_terms)
                 if match_count > 0:
                     seen.add(s_clean)
-                    extracted_sentences.append((match_count, chunk["document_name"], chunk["page_number"], s_clean))
+                    doc_name = chunk.get("document_name", "")
+                    chunk_sim = float(chunk.get("similarity_score", 0.5))
+                    title_boost = 1.5 if any(t in doc_name.lower() for t in key_terms) else 1.0
+                    combined_score = round((match_count * 2.0 + chunk_sim) * title_boost, 3)
+                    extracted_sentences.append((combined_score, doc_name, chunk.get("page_number", 1), s_clean))
 
         if not extracted_sentences and context_chunks:
             top_chunk = context_chunks[0]

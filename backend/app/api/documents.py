@@ -127,16 +127,17 @@ def initialize_sample_documents_if_empty():
     """
     Scans data/documents/ for initial sample documents and indexes them if documents table is empty.
     """
-    rows = execute_query("SELECT count(*) as cnt FROM documents")
-    if rows and rows[0]["cnt"] > 0:
-        return
-
     if not os.path.exists(settings.DOCUMENTS_DIR):
         return
+
+    existing_rows = execute_query("SELECT file_path FROM documents")
+    existing_paths = {os.path.abspath(row["file_path"]) for row in existing_rows} if existing_rows else set()
 
     sample_files = [f for f in os.listdir(settings.DOCUMENTS_DIR) if os.path.isfile(os.path.join(settings.DOCUMENTS_DIR, f))]
     for fname in sample_files:
         fpath = os.path.join(settings.DOCUMENTS_DIR, fname)
+        if os.path.abspath(fpath) in existing_paths:
+            continue
         ext = os.path.splitext(fname)[1].lower()
         if ext in settings.ALLOWED_EXTENSIONS:
             doc_id = str(uuid.uuid4())
