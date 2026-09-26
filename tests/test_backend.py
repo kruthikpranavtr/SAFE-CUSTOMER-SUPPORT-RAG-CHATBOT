@@ -130,3 +130,50 @@ def test_dashboard_metrics(client):
     assert stats["total_documents"] >= 5
     assert "feedback_distribution" in stats
     assert "confidence_distribution" in stats
+    assert "condition_a_catch_rate" in stats
+    assert "condition_b_catch_rate" in stats
+
+def test_escalations_flow(client):
+    payload = {
+        "customer_name": "Jane Doe",
+        "email": "jane@example.com",
+        "question": "My order #1234 arrived damaged, what are my options?",
+        "reason": "Need human assistance"
+    }
+    resp = client.post("/api/escalations", json=payload)
+    assert resp.status_code == 200
+    esc = resp.json()
+    assert esc["customer_name"] == "Jane Doe"
+    assert esc["status"] == "Pending"
+    assert esc["conversation_summary"] is not None
+    assert len(esc["conversation_summary"]) > 10
+
+    list_resp = client.get("/api/escalations")
+    assert list_resp.status_code == 200
+    all_esc = list_resp.json()
+    assert len(all_esc) >= 1
+    assert any(e["email"] == "jane@example.com" for e in all_esc)
+
+def test_risk_register(client):
+    resp = client.get("/api/risk-register")
+    assert resp.status_code == 200
+    items = resp.json()
+    assert len(items) >= 4
+    risks = [i["risk"] for i in items]
+    categories = [i["category"] for i in items]
+    assert "Automation Bias" in risks
+    assert "Overreliance on AI" in risks
+    assert "Safety" in categories
+
+def test_tamil_chat_response(client):
+    payload = {
+        "message": "பணம் திரும்பப் பெறுவதற்கான நிபந்தனைகள் என்ன?",
+        "language": "ta"
+    }
+    resp = client.post("/api/chat", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["role"] == "assistant"
+    assert data["language"] == "ta"
+    assert len(data["content"]) > 10
+

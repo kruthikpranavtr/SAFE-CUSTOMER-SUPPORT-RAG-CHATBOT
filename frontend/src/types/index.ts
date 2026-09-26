@@ -6,6 +6,14 @@ export interface SourceItem {
   similarity_score: number;
 }
 
+export interface EvidenceItem {
+  document_name: string;
+  page_number: number;
+  relevance: 'High' | 'Medium' | 'Low';
+  quote: string;
+  similarity_score: number;
+}
+
 export interface ChatMessage {
   id: string;
   session_id: string;
@@ -13,8 +21,10 @@ export interface ChatMessage {
   content: string;
   confidence?: 'High' | 'Moderate' | 'Low' | 'Unable to determine' | null;
   sources?: SourceItem[];
+  evidence_items?: EvidenceItem[];
   verification_notice?: string | null;
   retrieval_score?: number | null;
+  language?: string;
   created_at: string;
 }
 
@@ -64,12 +74,43 @@ export interface FeedbackInfo {
   created_at: string;
 }
 
+export interface EscalationRequest {
+  session_id?: string;
+  customer_name: string;
+  email: string;
+  question: string;
+  conversation_summary?: string;
+  reason: string;
+}
+
+export interface EscalationInfo {
+  id: string;
+  session_id?: string;
+  customer_name: string;
+  email: string;
+  question: string;
+  conversation_summary?: string;
+  reason: string;
+  status: string;
+  created_at: string;
+}
+
+export interface RiskItem {
+  id: string;
+  risk: string;
+  category: string;
+  status: string;
+  mitigation: string;
+  test_coverage: string;
+}
+
 export interface StudyScenario {
   id: string;
   title: string;
   customer_question: string;
   ai_answer: string;
   sources: SourceItem[];
+  evidence_items: EvidenceItem[];
   has_injected_error: boolean;
   error_description?: string | null;
   expected_answer: 'supported' | 'error' | 'insufficient';
@@ -79,6 +120,7 @@ export interface StudyScenario {
 export interface StudyStartResponse {
   study_session_id: string;
   participant_id: string;
+  condition: 'A' | 'B';
   scenarios: StudyScenario[];
 }
 
@@ -99,18 +141,26 @@ export interface StudyMetrics {
   error_catch_rate_percent: number;
   avg_response_time_seconds: number;
   source_view_rate_percent: number;
+  evidence_view_rate_percent: number;
+  condition_a_catch_rate: number;
+  condition_b_catch_rate: number;
 }
 
 export interface DashboardStats {
   total_conversations: number;
   total_questions: number;
   total_documents: number;
+  total_chunks: number;
   total_feedback: number;
+  total_escalations: number;
   helpful_responses: number;
   reported_incorrect_responses: number;
   user_study_participants: number;
   error_catch_rate: number;
   source_view_rate: number;
+  evidence_view_rate: number;
+  condition_a_catch_rate: number;
+  condition_b_catch_rate: number;
   feedback_distribution: Record<string, number>;
   confidence_distribution: Record<string, number>;
   error_detection_breakdown: Record<string, number>;

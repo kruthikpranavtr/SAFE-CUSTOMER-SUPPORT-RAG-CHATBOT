@@ -5,20 +5,24 @@ import { DocumentsPage } from './pages/DocumentsPage';
 import { UserStudyPage } from './pages/UserStudyPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { AboutPage } from './pages/AboutPage';
+import { RiskRegisterPage } from './pages/RiskRegisterPage';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('chat');
+  const [language, setLanguage] = useState<'en' | 'ta'>('en');
 
   const renderContent = () => {
     switch (activeTab) {
       case 'chat':
-        return <ChatPage />;
+        return <ChatPage language={language} onLanguageChange={setLanguage} />;
       case 'documents':
         return <DocumentsPage />;
       case 'study':
         return <UserStudyPage onNavigateToDashboard={() => setActiveTab('dashboard')} />;
       case 'dashboard':
         return <DashboardPage />;
+      case 'risk-register':
+        return <RiskRegisterPage />;
       case 'about':
         return (
           <AboutPage
@@ -27,12 +31,17 @@ export const App: React.FC = () => {
           />
         );
       default:
-        return <ChatPage />;
+        return <ChatPage language={language} onLanguageChange={setLanguage} />;
     }
   };
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+    <Layout
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      language={language}
+      onLanguageChange={setLanguage}
+    >
       {renderContent()}
     </Layout>
   );

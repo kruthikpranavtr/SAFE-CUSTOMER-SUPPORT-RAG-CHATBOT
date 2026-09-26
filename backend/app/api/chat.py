@@ -2,8 +2,8 @@ import uuid
 import json
 from datetime import datetime, timezone
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends
-from backend.app.models.schemas import ChatRequest, ChatMessage, ChatSessionInfo, SourceItem
+from fastapi import APIRouter, HTTPException
+from backend.app.models.schemas import ChatRequest, ChatMessage, ChatSessionInfo, SourceItem, EvidenceItem
 from backend.app.database.db import execute_query, execute_insert, execute_commit
 from backend.app.rag.rag_pipeline import rag_pipeline
 
@@ -17,6 +17,7 @@ async def send_chat_message(request: ChatRequest):
 
     now = datetime.now(timezone.utc).isoformat()
     session_id = request.session_id
+    lang = request.language or "en"
 
     # 1. Manage session
     if not session_id:
@@ -41,22 +42,24 @@ async def send_chat_message(request: ChatRequest):
     user_msg_id = str(uuid.uuid4())
     execute_insert(
         """
-        INSERT INTO messages (id, session_id, role, content, confidence, sources, verification_notice, retrieval_score, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO messages (id, session_id, role, content, confidence, sources, evidence_items, verification_notice, retrieval_score, language, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (user_msg_id, session_id, "user", user_query, None, json.dumps([]), None, 0.0, now)
+        (user_msg_id, session_id, "user", user_query, None, json.dumps([]), json.dumps([]), None, 0.0, lang, now)
     )
 
-    # 3. Execute RAG Pipeline
-    rag_result = await rag_pipeline.execute_rag(user_query)
+    # 3. Execute RAG Pipeline with Language option
+    rag_result = await rag_pipeline.execute_rag(user_query, language=lang)
     
     # 4. Save AI Message
     ai_msg_id = str(uuid.uuid4())
     sources_json = json.dumps([s.model_dump() for s in rag_result["sources"]])
+    evidence_json = json.dumps([e.model_dump() for e in rag_result["evidence_items"]])
+    
     execute_insert(
         """
-        INSERT INTO messages (id, session_id, role, content, confidence, sources, verification_notice, retrieval_score, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO messages (id, session_id, role, content, confidence, sources, evidence_items, verification_notice, retrieval_score, language, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             ai_msg_id,
@@ -65,8 +68,10 @@ async def send_chat_message(request: ChatRequest):
             rag_result["answer"],
             rag_result["confidence"],
             sources_json,
+            evidence_json,
             rag_result["verification_notice"],
             rag_result["retrieval_score"],
+            lang,
             now
         )
     )
@@ -78,8 +83,10 @@ async def send_chat_message(request: ChatRequest):
         content=rag_result["answer"],
         confidence=rag_result["confidence"],
         sources=rag_result["sources"],
+        evidence_items=rag_result["evidence_items"],
         verification_notice=rag_result["verification_notice"],
         retrieval_score=rag_result["retrieval_score"],
+        language=lang,
         created_at=now
     )
 
@@ -91,6 +98,10 @@ async def list_chat_sessions(user_id: Optional[str] = "demo-user"):
     )
     return [ChatSessionInfo(**r) for r in rows]
 
+@router.get("/history", response_model=List[ChatSessionInfo])
+async def get_chat_history(user_id: Optional[str] = "demo-user"):
+    return await list_chat_sessions(user_id)
+
 @router.get("/sessions/{session_id}", response_model=ChatSessionInfo)
 async def get_chat_session(session_id: str):
     sess_rows = execute_query("SELECT id, user_id, title, created_at, updated_at FROM chat_sessions WHERE id = ?", (session_id,))
@@ -100,7 +111,7 @@ async def get_chat_session(session_id: str):
     sess = sess_rows[0]
     msg_rows = execute_query(
         """
-        SELECT id, session_id, role, content, confidence, sources, verification_notice, retrieval_score, created_at
+        SELECT id, session_id, role, content, confidence, sources, evidence_items, verification_notice, retrieval_score, language, created_at
         FROM messages WHERE session_id = ? ORDER BY created_at ASC
         """,
         (session_id,)
@@ -115,6 +126,14 @@ async def get_chat_session(session_id: str):
                 sources_list = [SourceItem(**s) for s in raw_sources]
             except Exception:
                 sources_list = []
+
+        evidence_list = []
+        if m.get("evidence_items"):
+            try:
+                raw_evidence = json.loads(m["evidence_items"])
+                evidence_list = [EvidenceItem(**e) for e in raw_evidence]
+            except Exception:
+                evidence_list = []
         
         messages.append(ChatMessage(
             id=m["id"],
@@ -123,8 +142,10 @@ async def get_chat_session(session_id: str):
             content=m["content"],
             confidence=m["confidence"],
             sources=sources_list,
+            evidence_items=evidence_list,
             verification_notice=m["verification_notice"],
             retrieval_score=m["retrieval_score"],
+            language=m.get("language") or "en",
             created_at=m["created_at"]
         ))
 

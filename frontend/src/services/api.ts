@@ -5,6 +5,9 @@ import {
   DocumentChunk,
   FeedbackRequest,
   FeedbackInfo,
+  EscalationRequest,
+  EscalationInfo,
+  RiskItem,
   StudyStartResponse,
   StudyResponseResult,
   StudyMetrics,
@@ -29,11 +32,11 @@ async function handleResponse<T>(res: Response): Promise<T> {
 
 export const api = {
   // Chat
-  async sendMessage(message: string, sessionId?: string): Promise<ChatMessage> {
+  async sendMessage(message: string, sessionId?: string, language: string = 'en'): Promise<ChatMessage> {
     const res = await fetch(`${API_BASE}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, session_id: sessionId })
+      body: JSON.stringify({ message, session_id: sessionId, language })
     });
     return handleResponse<ChatMessage>(res);
   },
@@ -105,12 +108,33 @@ export const api = {
     return handleResponse<FeedbackInfo>(res);
   },
 
-  // User Study
-  async startStudy(name: string = 'Participant'): Promise<StudyStartResponse> {
+  // Escalations (Human Handoff)
+  async createEscalation(data: EscalationRequest): Promise<EscalationInfo> {
+    const res = await fetch(`${API_BASE}/escalations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return handleResponse<EscalationInfo>(res);
+  },
+
+  async getEscalations(): Promise<EscalationInfo[]> {
+    const res = await fetch(`${API_BASE}/escalations`);
+    return handleResponse<EscalationInfo[]>(res);
+  },
+
+  // Risk Register
+  async getRiskRegister(): Promise<RiskItem[]> {
+    const res = await fetch(`${API_BASE}/risk-register`);
+    return handleResponse<RiskItem[]>(res);
+  },
+
+  // User Study & Safety Lab
+  async startStudy(name: string = 'Participant', condition: 'A' | 'B' = 'B'): Promise<StudyStartResponse> {
     const res = await fetch(`${API_BASE}/study/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ participant_name: name })
+      body: JSON.stringify({ participant_name: name, condition })
     });
     return handleResponse<StudyStartResponse>(res);
   },
@@ -118,6 +142,7 @@ export const api = {
   async submitStudyResponse(payload: {
     study_session_id: string;
     scenario_id: string;
+    study_condition?: string;
     question: string;
     ai_answer: string;
     has_injected_error: boolean;
@@ -125,6 +150,7 @@ export const api = {
     expected_answer: string;
     response_time_ms: number;
     source_viewed: boolean;
+    evidence_viewed?: boolean;
   }): Promise<StudyResponseResult> {
     const res = await fetch(`${API_BASE}/study/response`, {
       method: 'POST',

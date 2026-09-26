@@ -1,7 +1,7 @@
 import sqlite3
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from backend.app.utils.config import settings
 
@@ -46,8 +46,10 @@ def init_db():
         content TEXT,
         confidence TEXT,
         sources TEXT,
+        evidence_items TEXT,
         verification_notice TEXT,
         retrieval_score REAL,
+        language TEXT DEFAULT 'en',
         created_at TEXT,
         FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
     );
@@ -67,7 +69,21 @@ def init_db():
     );
     """)
 
-    # 5. feedback
+    # 5. document_chunks
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS document_chunks (
+        id TEXT PRIMARY KEY,
+        document_id TEXT,
+        chunk_id TEXT,
+        filename TEXT,
+        page_number INTEGER,
+        text TEXT,
+        created_at TEXT,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+    );
+    """)
+
+    # 6. feedback
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS feedback (
         id TEXT PRIMARY KEY,
@@ -81,11 +97,27 @@ def init_db():
     );
     """)
 
-    # 6. study_sessions
+    # 7. escalations (Human Handoff)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS escalations (
+        id TEXT PRIMARY KEY,
+        session_id TEXT,
+        customer_name TEXT,
+        email TEXT,
+        question TEXT,
+        conversation_summary TEXT,
+        reason TEXT,
+        status TEXT DEFAULT 'Pending',
+        created_at TEXT
+    );
+    """)
+
+    # 8. study_sessions (A/B Testing Condition A / B)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS study_sessions (
         id TEXT PRIMARY KEY,
         participant_id TEXT,
+        study_condition TEXT DEFAULT 'B',
         started_at TEXT,
         completed_at TEXT,
         total_scenarios INTEGER DEFAULT 0,
@@ -93,12 +125,28 @@ def init_db():
     );
     """)
 
-    # 7. study_responses
+    # 9. study_scenarios
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS study_scenarios (
+        id TEXT PRIMARY KEY,
+        title TEXT,
+        category TEXT,
+        customer_question TEXT,
+        ai_answer TEXT,
+        expected_answer TEXT,
+        has_injected_error INTEGER,
+        error_description TEXT,
+        sources_json TEXT
+    );
+    """)
+
+    # 10. study_responses
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS study_responses (
         id TEXT PRIMARY KEY,
         study_session_id TEXT,
         scenario_id TEXT,
+        study_condition TEXT,
         question TEXT,
         ai_answer TEXT,
         has_injected_error INTEGER,
@@ -107,23 +155,75 @@ def init_db():
         correct INTEGER,
         response_time_ms INTEGER,
         source_viewed INTEGER,
+        evidence_viewed INTEGER DEFAULT 0,
         created_at TEXT,
         FOREIGN KEY (study_session_id) REFERENCES study_sessions(id) ON DELETE CASCADE
     );
     """)
 
-    # Create default demo user if not exists
+    # 11. risk_register
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS risk_register (
+        id TEXT PRIMARY KEY,
+        risk TEXT,
+        category TEXT,
+        status TEXT,
+        mitigation TEXT,
+        test_coverage TEXT
+    );
+    """)
+
+    # Schema migration helper for existing databases
+    def _add_col_if_missing(table_name: str, col_name: str, col_def: str):
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        existing = [c[1] for c in cursor.fetchall()]
+        if col_name not in existing:
+            cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_def}")
+
+    _add_col_if_missing("messages", "language", "TEXT DEFAULT 'en'")
+    _add_col_if_missing("messages", "evidence_items", "TEXT")
+    _add_col_if_missing("study_sessions", "study_condition", "TEXT DEFAULT 'B'")
+    _add_col_if_missing("study_responses", "study_condition", "TEXT DEFAULT 'B'")
+    _add_col_if_missing("study_responses", "evidence_viewed", "INTEGER DEFAULT 0")
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Default demo user
     cursor.execute("SELECT id FROM users WHERE id = 'demo-user'")
     if not cursor.fetchone():
         cursor.execute(
             "INSERT INTO users (id, name, email, role, created_at) VALUES (?, ?, ?, ?, ?)",
-            ("demo-user", "Demo Customer", "customer@example.com", "customer", datetime.utcnow().isoformat())
+            ("demo-user", "Customer User", "customer@technova-support-demo.com", "customer", now)
+        )
+
+    # Seed Risk Register items
+    cursor.execute("SELECT count(*) as cnt FROM risk_register")
+    if cursor.fetchone()["cnt"] == 0:
+        risks = [
+            ("risk-1", "Overreliance on AI", "Safety", "Partially Mitigated", 
+             "Direct citation of document snippets, required confirmation before critical action, and prominent verification guidance.", 
+             "Covered by Safety Lab Scenario Testing and automated test suites."),
+            ("risk-2", "Automation Bias", "Safety", "Partially Mitigated", 
+             "Dynamic confidence communication (High, Moderate, Low, Unable to determine) and persistent verification notices.", 
+             "Evaluated via A/B Safety Lab Error Catch Rate telemetry."),
+            ("risk-3", "Anthropomorphization", "Safety", "Mitigated", 
+             "Strictly labeled as 'AI Customer Support Assistant'. No human names, avatars, personal emotional statements, or false handling claims.", 
+             "System prompt boundary tests and UI persona audits."),
+            ("risk-4", "Hallucinated Company Policy", "Reliability", "Partially Mitigated", 
+             "Strict evidence-first RAG. Safe refusal ('Insufficient Information') when documents do not corroborate query topic.", 
+             "Verified with out-of-domain query tests in test_live_system.py."),
+            ("risk-5", "Prompt Injection via User Query or Document", "Security", "Partially Mitigated", 
+             "PromptGuard input sanitizer, unprivileged document content wrapping, and system prompt priority enforcement.", 
+             "Covered by adversarial prompt injection unit tests.")
+        ]
+        cursor.executemany(
+            "INSERT INTO risk_register (id, risk, category, status, mitigation, test_coverage) VALUES (?, ?, ?, ?, ?, ?)",
+            risks
         )
 
     conn.commit()
     conn.close()
 
-# Database Helper Functions
 def execute_query(query: str, params: tuple = ()) -> List[Dict[str, Any]]:
     conn = get_db_connection()
     try:

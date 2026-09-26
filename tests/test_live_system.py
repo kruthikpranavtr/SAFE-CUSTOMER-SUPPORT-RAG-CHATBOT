@@ -222,6 +222,59 @@ def run_tests():
     except Exception as e:
         errors.append(f"Admin Dashboard Telemetry: {e}")
 
+    # 12. Test Human Escalation Handoff
+    try:
+        esc_payload = {
+            "session_id": session_id,
+            "customer_name": "Kavitha Raman",
+            "email": "kavitha@example.com",
+            "question": "Can I get an extension on the warranty period due to hospital emergency?",
+            "reason": "Need human assistance"
+        }
+        r_esc = requests.post(f"{BASE_BACKEND}/api/escalations", json=esc_payload, timeout=5)
+        assert r_esc.status_code == 200, f"Expected 200, got {r_esc.status_code}"
+        esc_data = r_esc.json()
+        assert esc_data["status"] == "Pending"
+        assert esc_data["conversation_summary"] is not None
+        assert len(esc_data["conversation_summary"]) > 10
+
+        r_esc_list = requests.get(f"{BASE_BACKEND}/api/escalations", timeout=5)
+        assert r_esc_list.status_code == 200
+        assert len(r_esc_list.json()) > 0
+        print("✓ Human Escalation & Auto-Summary Passed")
+    except Exception as e:
+        errors.append(f"Human Escalation: {e}")
+
+    # 13. Test Risk Register Matrix
+    try:
+        r_risk = requests.get(f"{BASE_BACKEND}/api/risk-register", timeout=5)
+        assert r_risk.status_code == 200, f"Expected 200, got {r_risk.status_code}"
+        risks = r_risk.json()
+        assert len(risks) >= 4, f"Expected at least 4 risk items, got {len(risks)}"
+        risk_names = [item["risk"] for item in risks]
+        assert "Overreliance on AI" in risk_names
+        assert "Automation Bias" in risk_names
+        print(f"✓ Risk Register Matrix Passed ({len(risks)} monitored risks)")
+    except Exception as e:
+        errors.append(f"Risk Register Matrix: {e}")
+
+    # 14. Test Tamil Multilingual Chat
+    try:
+        ta_payload = {
+            "message": "பணம் திரும்பப் பெறுவதற்கான விதிமுறைகள் என்ன?",
+            "language": "ta"
+        }
+        r_ta = requests.post(f"{BASE_BACKEND}/api/chat", json=ta_payload, timeout=10)
+        assert r_ta.status_code == 200, f"Expected 200, got {r_ta.status_code}"
+        ta_data = r_ta.json()
+        assert ta_data["role"] == "assistant"
+        assert ta_data["language"] == "ta"
+        assert len(ta_data["content"]) > 10
+        assert len(ta_data["evidence_items"]) > 0
+        print("✓ Multilingual Chat (Tamil தமிழ்) Passed")
+    except Exception as e:
+        errors.append(f"Multilingual Chat (Tamil): {e}")
+
     print("\n--- TEST SUMMARY ---")
     if not errors:
         print("ALL TESTS PASSED! ZERO CRITICAL ERRORS FOUND.")
@@ -232,3 +285,4 @@ def run_tests():
 
 if __name__ == "__main__":
     run_tests()
+

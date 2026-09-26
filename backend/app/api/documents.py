@@ -144,7 +144,10 @@ def initialize_sample_documents_if_empty():
             now = datetime.utcnow().isoformat()
             
             # Format clean display title
-            clean_title = fname.replace("_", " ").replace(".txt", "").replace(".md", "").title() + (" (Policy Document)" if "policy" in fname.lower() else " (FAQ)")
+            clean_title = fname
+            for s_ext in [".pdf", ".txt", ".md", ".docx"]:
+                clean_title = clean_title.replace(s_ext, "").replace(s_ext.upper(), "")
+            clean_title = clean_title.replace("_", " ").title() + (" (Policy Document)" if "policy" in fname.lower() else " (FAQ)")
             
             execute_insert(
                 """

@@ -8,10 +8,18 @@ class SourceItem(BaseModel):
     content_snippet: str
     similarity_score: float
 
+class EvidenceItem(BaseModel):
+    document_name: str
+    page_number: int
+    relevance: str  # "High", "Medium", "Low"
+    quote: str
+    similarity_score: float
+
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, description="Customer question")
     session_id: Optional[str] = None
     user_id: Optional[str] = "demo-user"
+    language: Optional[str] = "en"  # "en" or "ta" (Tamil)
 
 class ChatMessage(BaseModel):
     id: str
@@ -20,8 +28,10 @@ class ChatMessage(BaseModel):
     content: str
     confidence: Optional[str] = None
     sources: Optional[List[SourceItem]] = []
+    evidence_items: Optional[List[EvidenceItem]] = []
     verification_notice: Optional[str] = None
     retrieval_score: Optional[float] = None
+    language: Optional[str] = "en"
     created_at: str
 
 class ChatSessionInfo(BaseModel):
@@ -65,13 +75,33 @@ class FeedbackInfo(BaseModel):
     comment: Optional[str] = None
     created_at: str
 
-# Study Models
+class EscalationRequest(BaseModel):
+    session_id: Optional[str] = None
+    customer_name: str = Field(..., min_length=1)
+    email: str = Field(..., min_length=3)
+    question: str = Field(..., min_length=1)
+    conversation_summary: Optional[str] = None
+    reason: str  # "AI answer seems incorrect", "Information not available", "Need human assistance", "Billing issue", "Other"
+
+class EscalationInfo(BaseModel):
+    id: str
+    session_id: Optional[str] = None
+    customer_name: str
+    email: str
+    question: str
+    conversation_summary: Optional[str] = None
+    reason: str
+    status: str
+    created_at: str
+
+# Study Models (with A/B testing support)
 class StudyScenario(BaseModel):
     id: str
     title: str
     customer_question: str
     ai_answer: str
     sources: List[SourceItem]
+    evidence_items: List[EvidenceItem]
     has_injected_error: bool
     error_description: Optional[str] = None
     expected_answer: str  # "supported", "error", "insufficient"
@@ -79,15 +109,18 @@ class StudyScenario(BaseModel):
 
 class StudyStartRequest(BaseModel):
     participant_name: Optional[str] = "Anonymous Participant"
+    condition: Optional[str] = "B"  # "A" (baseline) or "B" (safety-enhanced)
 
 class StudyStartResponse(BaseModel):
     study_session_id: str
     participant_id: str
+    condition: str
     scenarios: List[StudyScenario]
 
 class StudyResponseRequest(BaseModel):
     study_session_id: str
     scenario_id: str
+    study_condition: Optional[str] = "B"
     question: str
     ai_answer: str
     has_injected_error: bool
@@ -95,6 +128,7 @@ class StudyResponseRequest(BaseModel):
     expected_answer: str
     response_time_ms: int
     source_viewed: bool
+    evidence_viewed: Optional[bool] = False
 
 class StudyMetrics(BaseModel):
     total_participants: int
@@ -106,17 +140,33 @@ class StudyMetrics(BaseModel):
     error_catch_rate_percent: float
     avg_response_time_seconds: float
     source_view_rate_percent: float
+    evidence_view_rate_percent: float
+    condition_a_catch_rate: float
+    condition_b_catch_rate: float
+
+class RiskItem(BaseModel):
+    id: str
+    risk: str
+    category: str
+    status: str
+    mitigation: str
+    test_coverage: str
 
 class DashboardStats(BaseModel):
     total_conversations: int
     total_questions: int
     total_documents: int
+    total_chunks: int
     total_feedback: int
+    total_escalations: int
     helpful_responses: int
     reported_incorrect_responses: int
     user_study_participants: int
     error_catch_rate: float
     source_view_rate: float
+    evidence_view_rate: float
+    condition_a_catch_rate: float
+    condition_b_catch_rate: float
     feedback_distribution: Dict[str, int]
     confidence_distribution: Dict[str, int]
     error_detection_breakdown: Dict[str, int]
