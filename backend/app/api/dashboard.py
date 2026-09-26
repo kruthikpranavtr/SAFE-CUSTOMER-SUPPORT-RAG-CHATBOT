@@ -18,8 +18,12 @@ async def get_dashboard_metrics():
     d_res = execute_query("SELECT count(*) as cnt FROM documents")
     total_documents = d_res[0]["cnt"] if d_res else 0
 
-    chunk_res = execute_query("SELECT count(*) as cnt FROM document_chunks")
-    total_chunks = chunk_res[0]["cnt"] if chunk_res else 0
+    try:
+        from backend.app.rag.vector_store import vector_store
+        total_chunks = vector_store.collection.count()
+    except Exception:
+        chunk_res = execute_query("SELECT count(*) as cnt FROM document_chunks")
+        total_chunks = chunk_res[0]["cnt"] if chunk_res else 0
 
     # 4. Escalations
     esc_res = execute_query("SELECT count(*) as cnt FROM escalations")
