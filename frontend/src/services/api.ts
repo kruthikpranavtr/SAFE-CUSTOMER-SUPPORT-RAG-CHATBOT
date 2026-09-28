@@ -11,7 +11,10 @@ import {
   StudyStartResponse,
   StudyResponseResult,
   StudyMetrics,
-  DashboardStats
+  DashboardStats,
+  GuardrailStats,
+  GuardrailEvent,
+  GuardrailTestResponse
 } from '../types';
 
 const API_BASE = '/api';
@@ -185,6 +188,27 @@ export const api = {
   async getDashboardStats(): Promise<DashboardStats> {
     const res = await fetch(`${API_BASE}/dashboard`);
     return handleResponse<DashboardStats>(res);
+  },
+
+  // Guardrails
+  async getGuardrailStats(): Promise<GuardrailStats> {
+    const res = await fetch(`${API_BASE}/guardrails/stats`);
+    return handleResponse<GuardrailStats>(res);
+  },
+
+  async getGuardrailEvents(limit: number = 50, type?: string): Promise<GuardrailEvent[]> {
+    const url = type ? `${API_BASE}/guardrails/events?limit=${limit}&type=${type}` : `${API_BASE}/guardrails/events?limit=${limit}`;
+    const res = await fetch(url);
+    return handleResponse<GuardrailEvent[]>(res);
+  },
+
+  async runGuardrailTest(testType: string, customQuery?: string): Promise<GuardrailTestResponse> {
+    const res = await fetch(`${API_BASE}/guardrails/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ test_type: testType, custom_query: customQuery })
+    });
+    return handleResponse<GuardrailTestResponse>(res);
   },
 
   // Health

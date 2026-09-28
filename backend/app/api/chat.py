@@ -13,6 +13,7 @@ from backend.app.models.schemas import (
 )
 from backend.app.database.db import execute_query, execute_insert, execute_commit
 from backend.app.rag.rag_pipeline import rag_pipeline
+from backend.app.guardrails.pipeline import guardrails_pipeline
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -55,29 +56,67 @@ async def send_chat_message(request: ChatRequest):
         (user_msg_id, session_id, "user", user_query, None, json.dumps([]), json.dumps([]), None, 0.0, lang, now)
     )
 
-    # 3. Execute RAG Pipeline with Language option
-    rag_result = await rag_pipeline.execute_rag(user_query, language=lang)
+    # 3. Execute Guardrails Pipeline (Input Guard -> Prompt Guard -> RAG -> Output Guard -> Audit Logger)
+    res = await guardrails_pipeline.process_chat(
+        query=user_query,
+        session_id=session_id,
+        user_id=request.user_id,
+        language=lang
+    )
     
-    # 4. Save AI Message
+    # 4. Map structured sources to SourceItem & EvidenceItem
+    sources_list = []
+    evidence_list = []
+    if res.get("sources"):
+        for s in res["sources"]:
+            sources_list.append(SourceItem(
+                document_name=s.document_name,
+                page_number=s.page_number,
+                chunk_id=s.source_id,
+                content_snippet=s.snippet,
+                similarity_score=s.similarity_score
+            ))
+            relevance = "High" if s.similarity_score >= 0.55 else ("Medium" if s.similarity_score >= 0.35 else "Low")
+            evidence_list.append(EvidenceItem(
+                document_name=s.document_name,
+                page_number=s.page_number,
+                relevance=relevance,
+                quote=s.snippet[:200],
+                similarity_score=s.similarity_score
+            ))
+
+    # 5. Save AI Message
     ai_msg_id = str(uuid.uuid4())
-    sources_json = json.dumps([s.model_dump() for s in rag_result["sources"]])
-    evidence_json = json.dumps([e.model_dump() for e in rag_result["evidence_items"]])
-    
+    sources_json = json.dumps([s.model_dump() for s in sources_list])
+    evidence_json = json.dumps([e.model_dump() for e in evidence_list])
+    conf_str = res["confidence"].value if hasattr(res["confidence"], "value") else str(res["confidence"])
+    status_str = res["status"].value if hasattr(res["status"], "value") else str(res["status"])
+    guardrail_flags_json = json.dumps(res.get("guardrail_flags", []))
+    action_conf_json = json.dumps(res.get("action_confirmation")) if res.get("action_confirmation") else None
+
     execute_insert(
         """
-        INSERT INTO messages (id, session_id, role, content, confidence, sources, evidence_items, verification_notice, retrieval_score, language, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO messages (
+            id, session_id, role, content, confidence, status, guardrail_flags,
+            action_confirmation, pii_warning, sources, evidence_items,
+            verification_notice, retrieval_score, language, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             ai_msg_id,
             session_id,
             "assistant",
-            rag_result["answer"],
-            rag_result["confidence"],
+            res["answer"],
+            conf_str,
+            status_str,
+            guardrail_flags_json,
+            action_conf_json,
+            res.get("pii_warning"),
             sources_json,
             evidence_json,
-            rag_result["verification_notice"],
-            rag_result["retrieval_score"],
+            res.get("verification_notice"),
+            res.get("retrieval_score", 0.0),
             lang,
             now
         )
@@ -87,12 +126,19 @@ async def send_chat_message(request: ChatRequest):
         id=ai_msg_id,
         session_id=session_id,
         role="assistant",
-        content=rag_result["answer"],
-        confidence=rag_result["confidence"],
-        sources=rag_result["sources"],
-        evidence_items=rag_result["evidence_items"],
-        verification_notice=rag_result["verification_notice"],
-        retrieval_score=rag_result["retrieval_score"],
+        content=res["answer"],
+        confidence=conf_str,
+        status=status_str,
+        evidence_status=res.get("evidence_status", "SUPPORTED"),
+        requires_human=res.get("requires_human", False),
+        verification_required=res.get("verification_required", True),
+        pii_warning=res.get("pii_warning"),
+        action_confirmation=res.get("action_confirmation"),
+        guardrail_flags=res.get("guardrail_flags", []),
+        sources=sources_list,
+        evidence_items=evidence_list,
+        verification_notice=res.get("verification_notice"),
+        retrieval_score=res.get("retrieval_score", 0.0),
         language=lang,
         created_at=now
     )
@@ -142,12 +188,33 @@ async def get_chat_session(session_id: str):
             except Exception:
                 evidence_list = []
         
+        action_conf = None
+        if m.get("action_confirmation"):
+            try:
+                action_conf = json.loads(m["action_confirmation"])
+            except Exception:
+                pass
+
+        flags = []
+        if m.get("guardrail_flags"):
+            try:
+                flags = json.loads(m["guardrail_flags"])
+            except Exception:
+                pass
+
         messages.append(ChatMessage(
             id=m["id"],
             session_id=m["session_id"],
             role=m["role"],
             content=m["content"],
             confidence=m["confidence"],
+            status=m.get("status") or "SUPPORTED",
+            evidence_status=m.get("status") or "SUPPORTED",
+            requires_human=m.get("status") in ["ABSTAINED", "ESCALATED", "UNSUPPORTED"],
+            verification_required=True,
+            pii_warning=m.get("pii_warning"),
+            action_confirmation=action_conf,
+            guardrail_flags=flags,
             sources=sources_list,
             evidence_items=evidence_list,
             verification_notice=m["verification_notice"],

@@ -173,6 +173,22 @@ def init_db():
     );
     """)
 
+    # 12. guardrail_events (Safety Audit Logging)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS guardrail_events (
+        id TEXT PRIMARY KEY,
+        request_id TEXT,
+        session_id TEXT,
+        user_id TEXT,
+        guardrail_type TEXT,
+        severity TEXT,
+        action TEXT,
+        reason TEXT,
+        details TEXT,
+        created_at TEXT
+    );
+    """)
+
     # Schema migration helper for existing databases
     def _add_col_if_missing(table_name: str, col_name: str, col_def: str):
         cursor.execute(f"PRAGMA table_info({table_name})")
@@ -182,6 +198,10 @@ def init_db():
 
     _add_col_if_missing("messages", "language", "TEXT DEFAULT 'en'")
     _add_col_if_missing("messages", "evidence_items", "TEXT")
+    _add_col_if_missing("messages", "status", "TEXT DEFAULT 'SUPPORTED'")
+    _add_col_if_missing("messages", "guardrail_flags", "TEXT")
+    _add_col_if_missing("messages", "action_confirmation", "TEXT")
+    _add_col_if_missing("messages", "pii_warning", "TEXT")
     _add_col_if_missing("study_sessions", "study_condition", "TEXT DEFAULT 'B'")
     _add_col_if_missing("study_responses", "study_condition", "TEXT DEFAULT 'B'")
     _add_col_if_missing("study_responses", "evidence_viewed", "INTEGER DEFAULT 0")

@@ -261,36 +261,35 @@ export const ChatPage: React.FC<ChatPageProps> = ({
   };
 
   const renderConfidenceBadge = (confidence?: string | null) => {
-    switch (confidence) {
-      case 'High':
-        return (
-          <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Confidence: High</span>
-          </div>
-        );
-      case 'Moderate':
-        return (
-          <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-            <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-            <span>Confidence: Moderate</span>
-          </div>
-        );
-      case 'Low':
-        return (
-          <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
-            <AlertTriangle className="w-3.5 h-3.5 text-orange-600" />
-            <span>Confidence: Low</span>
-          </div>
-        );
-      case 'Unable to determine':
-      default:
-        return (
-          <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-            <HelpCircle className="w-3.5 h-3.5 text-rose-600" />
-            <span>Confidence: Unable to determine</span>
-          </div>
-        );
+    const confUpper = (confidence || '').toUpperCase();
+    if (confUpper.includes('HIGH')) {
+      return (
+        <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Evidence Support: HIGH</span>
+        </div>
+      );
+    } else if (confUpper.includes('MEDIUM') || confUpper.includes('MODERATE')) {
+      return (
+        <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+          <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+          <span>Evidence Support: MEDIUM</span>
+        </div>
+      );
+    } else if (confUpper.includes('LOW')) {
+      return (
+        <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
+          <AlertTriangle className="w-3.5 h-3.5 text-orange-600" />
+          <span>Evidence Support: LOW</span>
+        </div>
+      );
+    } else {
+      return (
+        <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+          <HelpCircle className="w-3.5 h-3.5 text-rose-600" />
+          <span>Evidence Support: UNABLE TO DETERMINE</span>
+        </div>
+      );
     }
   };
 
@@ -569,10 +568,69 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                       {renderConfidenceBadge(msg.confidence)}
                     </div>
 
+                    {/* PII Warning Notice if detected */}
+                    {msg.pii_warning && (
+                      <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-900 flex items-center space-x-2">
+                        <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span className="font-medium">{msg.pii_warning}</span>
+                      </div>
+                    )}
+
                     {/* Actual Answer Content */}
                     <div className="text-xs sm:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
                       {msg.content}
                     </div>
+
+                    {/* Action Confirmation Interactive Box (INFORM -> CONFIRM -> ACT) */}
+                    {msg.action_confirmation && (
+                      <div className="p-3.5 bg-blue-50/90 border border-blue-200 rounded-xl space-y-2.5">
+                        <div className="flex items-center space-x-2 text-blue-950 font-semibold text-xs">
+                          <AlertCircle className="w-4 h-4 text-blue-600" />
+                          <span>Action Confirmation: {msg.action_confirmation.action_name}</span>
+                        </div>
+                        <p className="text-xs text-blue-800 leading-relaxed">
+                          {msg.action_confirmation.confirmation_prompt}
+                        </p>
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleSendMessage(`Confirm ${msg.action_confirmation?.action_name} for ${msg.action_confirmation?.target_identifier}`)}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+                          >
+                            Confirm {msg.action_confirmation.action_name}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSendMessage(`Go back, do not proceed with ${msg.action_confirmation?.action_name}`)}
+                            className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-medium transition"
+                          >
+                            Go Back
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Human Escalation Alert when Abstention or Low Evidence occurs */}
+                    {msg.requires_human && (
+                      <div className="p-3 bg-amber-50/90 border border-amber-300/80 rounded-xl flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center space-x-2 text-xs text-amber-900">
+                          <UserCheck className="w-4 h-4 text-amber-700 shrink-0" />
+                          <span>AI cannot safely verify this question. Would you like to contact human support?</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+                            setEscalationData({
+                              userQuestion: lastUser?.content || '',
+                              lastAiAnswer: msg.content
+                            });
+                          }}
+                          className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shrink-0 transition shadow-sm"
+                        >
+                          Contact Human Support
+                        </button>
+                      </div>
+                    )}
 
                     {/* Evidence Inspector Button & Sources Attribution */}
                     {msg.evidence_items && msg.evidence_items.length > 0 && (
@@ -590,7 +648,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                             className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold transition"
                           >
                             <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                            <span>Why this answer? (Evidence Inspector)</span>
+                            <span>View Evidence (Inspector)</span>
                           </button>
                         </div>
 

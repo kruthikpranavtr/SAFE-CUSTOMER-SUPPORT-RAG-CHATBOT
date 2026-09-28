@@ -27,6 +27,13 @@ class ChatMessage(BaseModel):
     role: str
     content: str
     confidence: Optional[str] = None
+    status: Optional[str] = "SUPPORTED"
+    evidence_status: Optional[str] = "SUPPORTED"
+    requires_human: Optional[bool] = False
+    verification_required: Optional[bool] = True
+    pii_warning: Optional[str] = None
+    action_confirmation: Optional[Dict[str, Any]] = None
+    guardrail_flags: Optional[List[str]] = []
     sources: Optional[List[SourceItem]] = []
     evidence_items: Optional[List[EvidenceItem]] = []
     verification_notice: Optional[str] = None

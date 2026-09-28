@@ -19,7 +19,19 @@ export interface ChatMessage {
   session_id: string;
   role: 'user' | 'assistant';
   content: string;
-  confidence?: 'High' | 'Moderate' | 'Low' | 'Unable to determine' | null;
+  confidence?: 'High' | 'Moderate' | 'Low' | 'Unable to determine' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNABLE_TO_DETERMINE' | string | null;
+  status?: string;
+  evidence_status?: string;
+  requires_human?: boolean;
+  verification_required?: boolean;
+  pii_warning?: string | null;
+  action_confirmation?: {
+    action_name: string;
+    target_identifier: string;
+    confirmation_prompt: string;
+    requires_confirmation: boolean;
+  } | null;
+  guardrail_flags?: string[];
   sources?: SourceItem[];
   evidence_items?: EvidenceItem[];
   verification_notice?: string | null;
@@ -164,4 +176,40 @@ export interface DashboardStats {
   feedback_distribution: Record<string, number>;
   confidence_distribution: Record<string, number>;
   error_detection_breakdown: Record<string, number>;
+}
+
+export interface GuardrailStats {
+  total_events: number;
+  prompt_injections_blocked: number;
+  pii_detected: number;
+  abstentions: number;
+  evidence_failures: number;
+  human_escalations: number;
+  domain_violations: number;
+  by_type: Record<string, number>;
+  by_severity: Record<string, number>;
+}
+
+export interface GuardrailEvent {
+  id: string;
+  request_id: string;
+  session_id?: string;
+  user_id?: string;
+  guardrail_type: string;
+  severity: string;
+  action: string;
+  reason: string;
+  details?: Record<string, any>;
+  created_at: string;
+}
+
+export interface GuardrailTestResponse {
+  test_type: string;
+  test_name: string;
+  query_used: string;
+  expected_result: string;
+  actual_result: string;
+  passed: boolean;
+  status: string;
+  details: Record<string, any>;
 }

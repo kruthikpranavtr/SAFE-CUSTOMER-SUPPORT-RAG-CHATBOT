@@ -286,3 +286,66 @@ The system automatically includes, parses, and indexes 7 multi-page PDF company 
 | **Phase 8** | **Analytics Dashboard & Risk Register** | Executive telemetry dashboard (session statistics, question counts, satisfaction ratings, A/B performance) and formal AI Safety Risk Matrix monitoring 5 critical failure modes with mitigation tracking. | `VERIFIED` |
 | **Phase 9** | **Advanced Security & Multilingual Support** | `PromptGuard` defense against prompt injections, system prompt leaks, and delimiter breakouts; cross-lingual RAG expansion for Tamil (தமிழ்) with domain-specific keyword translation and synthesized Tamil responses. | `VERIFIED` |
 | **Phase 10** | **End-to-End Verification & Presentation Prep** | Full test suite execution: 10/10 pytest unit tests passing, 18/18 live system integration tests passing with 0 errors, Vite production build verified (`0 errors`), and clean GitHub synchronization. | `VERIFIED` |
+| **Phase 11** | **Production-Style Custom Guardrails System** | Multi-layer custom guardrail architecture (`InputGuard`, `PromptGuard`, `OutputGuard`, `SafetyGuard`, `Pipeline`, `AuditLogger`), SQLite audit log stream (`guardrail_events`), 8-scenario interactive AI Safety Testing Lab, and full 12/12 automated guardrail test cases passing. | `VERIFIED` |
+
+---
+
+## 15. SafeSupport AI Custom Guardrail System Architecture
+
+SafeSupport AI implements a defense-in-depth **custom guardrails architecture** designed to eliminate overreliance, automation bias, anthropomorphization, hallucinated customer-support answers, and prompt injection attacks.
+
+```
+       [ Incoming User Request ]
+                  │
+                  ▼
+       ┌──────────────────────┐
+       │   1. INPUT GUARD     │ ──> PII Guard (redacts phone/email/cards/SSN)
+       │                      │ ──> Domain Guard (blocks coding, creative writing, homework)
+       │                      │ ──> Rate Limit Guard (sliding-window per IP/client)
+       └──────────┬───────────┘
+                  │
+                  ▼
+       ┌──────────────────────┐
+       │   2. PROMPT GUARD    │ ──> Prompt Injection Guard (blocks jailbreaks, prompt leaks)
+       │                      │ ──> Context Boundary Guard (wraps untrusted company docs)
+       └──────────┬───────────┘
+                  │
+                  ▼
+       ┌──────────────────────┐
+       │   3. RETRIEVAL &     │ ──> Evidence-Only Guard (minimum 0.30 relevance threshold)
+       │      EVIDENCE GUARD  │ ──> Abstention Guard (deterministic safe refusal if missing)
+       └──────────┬───────────┘
+                  │
+                  ▼
+       ┌──────────────────────┐
+       │   4. OUTPUT GUARD    │ ──> Evidence Consistency Guard (extracts & cross-checks numbers/terms)
+       │                      │ ──> Contradiction Detection (abstains if answer conflicts with policy)
+       │                      │ ──> Confidence Guard (calibrated HIGH / MEDIUM / LOW / UNABLE)
+       │                      │ ──> Source Attribution Guard (validated document & page metadata)
+       └──────────┬───────────┘
+                  │
+                  ▼
+       ┌──────────────────────┐
+       │   5. HUMAN SAFETY    │ ──> Human Escalation Guard (handoff on dispute, low confidence, or request)
+       │      & ESCALATION    │ ──> Action Confirmation Guard (INFORM -> CONFIRM -> ACT for orders/deletion)
+       │                      │ ──> AI Identity Disclosure ("I am an AI assistant...")
+       └──────────┬───────────┘
+                  │
+                  ▼
+       ┌──────────────────────┐
+       │   6. AUDIT & LAB     │ ──> Real-time SQLite Audit Logger (`guardrail_events` table)
+       │                      │ ──> AI Safety Testing Lab (8 interactive scenario tests)
+       │                      │ ──> Automation Bias User Study (A/B research evaluation)
+       └──────────────────────┘
+```
+
+### Supported Guardrail Scenarios (AI Safety Testing Lab)
+1. **Normal Supported Question:** Verifies legitimate refund/shipping questions retrieve sources with HIGH confidence.
+2. **Missing Evidence (Abstention):** Refuses to hallucinate on missing policies (e.g., Martian crypto) and safely abstains.
+3. **Prompt Injection Defense:** Blocks jailbreak attempts, delimiter breakouts, and prompt extraction.
+4. **Sensitive PII Input:** Redacts phone numbers, emails, credit cards, and SSNs with user-facing safety warnings.
+5. **Out-of-Domain Scope Enforcement:** Rejects queries unrelated to customer support (coding, essays, etc.).
+6. **Evidence Contradiction Detection:** Detects fabricated numbers (e.g., claiming 30 days when policy states 7 days) and triggers abstention.
+7. **Low Evidence & Human Escalation:** Offers one-click escalation to human representatives when evidence is weak or requested.
+8. **High-Impact Action Confirmation:** Enforces `INFORM → CONFIRM → ACT` on sensitive operations like order cancellation or account deletion.
+

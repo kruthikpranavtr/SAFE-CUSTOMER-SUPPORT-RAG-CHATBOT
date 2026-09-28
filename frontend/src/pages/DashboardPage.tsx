@@ -11,18 +11,23 @@ import {
   RefreshCw,
   TrendingUp,
   ShieldCheck,
+  ShieldAlert,
+  Lock,
   CheckCircle2,
   XCircle,
   HelpCircle,
   UserCheck,
   Sparkles,
-  Layers
+  Layers,
+  Clock
 } from 'lucide-react';
 import { api } from '../services/api';
-import { DashboardStats } from '../types';
+import { DashboardStats, GuardrailStats, GuardrailEvent } from '../types';
 
 export const DashboardPage: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [guardrailStats, setGuardrailStats] = useState<GuardrailStats | null>(null);
+  const [recentEvents, setRecentEvents] = useState<GuardrailEvent[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -32,8 +37,14 @@ export const DashboardPage: React.FC = () => {
   const loadDashboard = async () => {
     setIsLoading(true);
     try {
-      const data = await api.getDashboardStats();
+      const [data, gStats, events] = await Promise.all([
+        api.getDashboardStats(),
+        api.getGuardrailStats().catch(() => null),
+        api.getGuardrailEvents(30).catch(() => [])
+      ]);
       setStats(data);
+      setGuardrailStats(gStats);
+      setRecentEvents(events || []);
     } catch (err: any) {
       console.error('Failed to load dashboard:', err);
     } finally {
@@ -304,6 +315,140 @@ export const DashboardPage: React.FC = () => {
               );
             })}
           </div>
+        </div>
+      </div>
+
+      {/* AI Safety & Custom Guardrails Telemetry */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+          <div>
+            <h3 className="font-bold text-base text-slate-900 flex items-center space-x-2">
+              <ShieldAlert className="w-5 h-5 text-indigo-600" />
+              <span>Production Guardrails Safety Telemetry</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Deterministic, evidence-based metrics tracking active defenses against hallucination, prompt injection, and PII exposure.
+            </p>
+          </div>
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            Real-Time Audit Active
+          </span>
+        </div>
+
+        {/* 8 Guardrail Metric Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* 1. Questions Processed */}
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Questions Processed</span>
+            <p className="text-xl font-bold text-slate-900">{stats.total_questions}</p>
+            <span className="text-[11px] text-slate-400">Total chat requests</span>
+          </div>
+
+          {/* 2. Evidence Failures */}
+          <div className="p-4 bg-rose-50/60 rounded-xl border border-rose-200/80 space-y-1">
+            <span className="text-[11px] font-semibold text-rose-700 uppercase tracking-wider block">Evidence Failures</span>
+            <p className="text-xl font-bold text-rose-800">{guardrailStats?.evidence_failures || 0}</p>
+            <span className="text-[11px] text-rose-600/80">Contradictions & ungrounded</span>
+          </div>
+
+          {/* 3. Abstentions */}
+          <div className="p-4 bg-amber-50/60 rounded-xl border border-amber-200/80 space-y-1">
+            <span className="text-[11px] font-semibold text-amber-700 uppercase tracking-wider block">Abstentions</span>
+            <p className="text-xl font-bold text-amber-800">{guardrailStats?.abstentions || 0}</p>
+            <span className="text-[11px] text-amber-600/80">Refused to guess</span>
+          </div>
+
+          {/* 4. Prompt Injections Blocked */}
+          <div className="p-4 bg-red-50/60 rounded-xl border border-red-200/80 space-y-1">
+            <span className="text-[11px] font-semibold text-red-700 uppercase tracking-wider block">Prompt Injections</span>
+            <p className="text-xl font-bold text-red-800">{guardrailStats?.prompt_injections_blocked || 0}</p>
+            <span className="text-[11px] text-red-600/80">Adversarial attacks blocked</span>
+          </div>
+
+          {/* 5. PII Detections */}
+          <div className="p-4 bg-purple-50/60 rounded-xl border border-purple-200/80 space-y-1">
+            <span className="text-[11px] font-semibold text-purple-700 uppercase tracking-wider block">PII Detections</span>
+            <p className="text-xl font-bold text-purple-800">{guardrailStats?.pii_detected || 0}</p>
+            <span className="text-[11px] text-purple-600/80">Redacted sensitive tokens</span>
+          </div>
+
+          {/* 6. Human Escalations */}
+          <div className="p-4 bg-amber-50/60 rounded-xl border border-amber-200/80 space-y-1">
+            <span className="text-[11px] font-semibold text-amber-700 uppercase tracking-wider block">Human Escalations</span>
+            <p className="text-xl font-bold text-amber-800">{guardrailStats?.human_escalations || stats.total_escalations || 0}</p>
+            <span className="text-[11px] text-amber-600/80">Handed off to agent</span>
+          </div>
+
+          {/* 7. Low Confidence Answers */}
+          <div className="p-4 bg-orange-50/60 rounded-xl border border-orange-200/80 space-y-1">
+            <span className="text-[11px] font-semibold text-orange-700 uppercase tracking-wider block">Low Confidence</span>
+            <p className="text-xl font-bold text-orange-800">{stats.confidence_distribution['Low'] || stats.confidence_distribution['LOW'] || 0}</p>
+            <span className="text-[11px] text-orange-600/80">Weak evidence warnings</span>
+          </div>
+
+          {/* 8. Out-of-Domain Requests */}
+          <div className="p-4 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-1">
+            <span className="text-[11px] font-semibold text-blue-700 uppercase tracking-wider block">Out-of-Domain</span>
+            <p className="text-xl font-bold text-blue-800">{guardrailStats?.domain_violations || 0}</p>
+            <span className="text-[11px] text-blue-600/80">Redirected inquiries</span>
+          </div>
+        </div>
+
+        {/* Safety Audit Log Stream */}
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              Live Safety Audit Log ({recentEvents.length} Events)
+            </span>
+            <span className="text-[11px] text-slate-400">No raw PII stored</span>
+          </div>
+
+          {recentEvents.length === 0 ? (
+            <p className="text-xs text-slate-400 p-4 text-center italic border border-dashed border-slate-200 rounded-xl">
+              No guardrail events recorded yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto max-h-[300px] border border-slate-200 rounded-xl">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[11px] uppercase tracking-wider font-semibold">
+                  <tr>
+                    <th className="p-2.5">Timestamp</th>
+                    <th className="p-2.5">Guardrail</th>
+                    <th className="p-2.5">Severity</th>
+                    <th className="p-2.5">Action</th>
+                    <th className="p-2.5">Reason</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {recentEvents.map((e) => (
+                    <tr key={e.id} className="hover:bg-slate-50/80 transition">
+                      <td className="p-2.5 font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                        {e.created_at ? new Date(e.created_at).toLocaleTimeString() : 'Just now'}
+                      </td>
+                      <td className="p-2.5 font-medium text-slate-800">
+                        {e.guardrail_type}
+                      </td>
+                      <td className="p-2.5">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                          e.severity === 'CRITICAL' ? 'bg-red-100 text-red-800' :
+                          e.severity === 'HIGH' ? 'bg-rose-100 text-rose-800' :
+                          e.severity === 'MEDIUM' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {e.severity}
+                        </span>
+                      </td>
+                      <td className="p-2.5 font-mono text-[11px] text-slate-600 font-semibold">
+                        {e.action}
+                      </td>
+                      <td className="p-2.5 text-slate-600 truncate max-w-[320px]">
+                        {e.reason}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>

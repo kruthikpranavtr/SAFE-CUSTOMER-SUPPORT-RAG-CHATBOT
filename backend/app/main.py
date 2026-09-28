@@ -13,6 +13,7 @@ from backend.app.api.study import router as study_router
 from backend.app.api.dashboard import router as dashboard_router
 from backend.app.api.escalations import router as escalations_router
 from backend.app.api.risk_register import router as risk_register_router
+from backend.app.api.guardrails import router as guardrails_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -48,6 +49,7 @@ app.include_router(study_router, prefix=settings.API_V1_STR)
 app.include_router(dashboard_router, prefix=settings.API_V1_STR)
 app.include_router(escalations_router, prefix=settings.API_V1_STR)
 app.include_router(risk_register_router, prefix=settings.API_V1_STR)
+app.include_router(guardrails_router, prefix=settings.API_V1_STR)
 
 @app.get("/api/health")
 async def health_check():

@@ -43,13 +43,36 @@ async def upload_document(file: UploadFile = File(...)):
     os.makedirs(settings.DOCUMENTS_DIR, exist_ok=True)
     target_path = os.path.join(settings.DOCUMENTS_DIR, f"{doc_id}_{filename}")
 
-    # Read and validate size
+    # Read and validate size & content
     contents = await file.read()
+    if len(contents) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty (0 bytes). Cannot index empty documents.")
+
     if len(contents) > settings.MAX_UPLOAD_SIZE_BYTES:
         raise HTTPException(status_code=400, detail=f"File exceeds maximum allowed size of {settings.MAX_UPLOAD_SIZE_BYTES / (1024*1024)}MB.")
 
+    # Duplicate document check
+    existing_doc = execute_query("SELECT id FROM documents WHERE filename = ?", (filename,))
+    if existing_doc:
+        raise HTTPException(status_code=400, detail=f"Duplicate document: '{filename}' is already indexed in the knowledge base.")
+
     with open(target_path, "wb") as f:
         f.write(contents)
+
+    # Validate readability and non-corruption before database insertion
+    try:
+        pages_data = DocumentProcessor.extract_text_from_file(target_path)
+        total_text_len = sum(len(p.get("text", "").strip()) for p in pages_data)
+        if not pages_data or total_text_len == 0:
+            if os.path.exists(target_path):
+                os.remove(target_path)
+            raise HTTPException(status_code=400, detail=f"Corrupted or unreadable file: '{filename}' contains no extractable text.")
+    except Exception as e:
+        if os.path.exists(target_path):
+            os.remove(target_path)
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=400, detail=f"Failed to read file '{filename}': {str(e)}")
 
     now = datetime.utcnow().isoformat()
     execute_insert(
