@@ -39,15 +39,22 @@ class ChatMessage(BaseModel):
     verification_notice: Optional[str] = None
     retrieval_score: Optional[float] = None
     language: Optional[str] = "en"
+    intent: Optional[str] = None
+    suggestions: Optional[List[str]] = []
+    rewritten_query: Optional[str] = None
     created_at: str
 
 class ChatSessionInfo(BaseModel):
     id: str
     user_id: str
     title: str
+    summary: Optional[str] = None
     created_at: str
     updated_at: str
     messages: Optional[List[ChatMessage]] = []
+
+class RenameSessionRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=120)
 
 class BulkDeleteSessionsRequest(BaseModel):
     session_ids: List[str]

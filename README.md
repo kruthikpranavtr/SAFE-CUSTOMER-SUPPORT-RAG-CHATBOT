@@ -349,3 +349,31 @@ SafeSupport AI implements a defense-in-depth **custom guardrails architecture** 
 7. **Low Evidence & Human Escalation:** Offers one-click escalation to human representatives when evidence is weak or requested.
 8. **High-Impact Action Confirmation:** Enforces `INFORM → CONFIRM → ACT` on sensitive operations like order cancellation or account deletion.
 
+---
+
+## 16. Real Customer Support Chat Experience & Multi-Turn Engine (Sections 31–59)
+
+SafeSupport AI features a production-style, multi-turn conversational customer support engine that delivers natural, responsive interactions without compromising strict safety guardrails.
+
+### Conversational Architecture & Key Capabilities
+* **Multi-Turn Memory & Controlled Windowing:** Maintains short-term conversation context (sliding window of 6 turns) while generating compact, factual summaries for extended chats to prevent prompt drift and context bloat.
+* **Deterministic Intent Classification:** Classifies user intent (`GREETING`, `PRODUCT_INFO`, `ORDER_STATUS`, `DELIVERY`, `RETURN`, `REFUND`, `CANCELLATION`, `WARRANTY`, `PAYMENT`, `ACCOUNT`, `COMPLAINT`, `HUMAN_SUPPORT`, `CLARIFICATION_RESPONSE`, `OUT_OF_SCOPE`) across English, Tamil (தமிழ்), and Tanglish.
+* **Contextual RAG Query Rewriter:** Expands pronouns and follow-up fragments (e.g., *"What about damaged products?"* -> `refund and return policy damaged products?`) into self-contained search queries, ensuring ChromaDB retrieves accurate policy clauses without altering the user's visible message.
+* **Ambiguity Detection & Clarification Guardrail:** Flags underspecified requests (e.g., *"I want to cancel it"*) and politely requests the order reference number (e.g., `#Nova-9876`) instead of guessing or fabricating actions.
+* **Domain-Grounded Suggestion Chips:** Dynamically suggests 2–3 contextual next steps on every turn based on the identified intent and active policy topic.
+* **Real Customer Support Actions:** Real database operations on the SQLite `orders` table (lookup and verified cancellation for orders `#Nova-9876`, `#Nova-1024`, `#Nova-5521`) following the strict `INFORM → CONFIRM → ACT` protocol.
+* **Interactive Message Toolbar:** Each response includes one-click Copy with feedback confirmation, Regenerate with re-evaluated guardrails, Thumbs up/down with categorized issue reporting, View Sources, View Evidence, and Human Escalation.
+* **Enhanced Session Management & Sidebar:** Sessions are automatically date-grouped (*Today*, *Yesterday*, *Previous*), searchable in real-time, support inline renaming (`PUT /api/chat/sessions/{id}/rename`), single and multi-select bulk deletion (`POST /api/chat/sessions/bulk-delete`), and compact summary inspection.
+
+### Section 59 — Core Verification Demos (`tests/test_section59_demos.py`)
+All 8 end-to-end demonstrations mandated by Section 59 are fully implemented and verified with automated test coverage:
+1. **Demo 1 — Greeting -> Normal Question -> Answer -> Source:** Handles greeting with clear AI disclosure, followed by grounded refund policy answer with citations.
+2. **Demo 2 — Question -> Follow-up Question -> Context-Aware Answer:** Follows up on refund inquiry with *"What about damaged products?"*, rewritten contextually to retrieve inspection and RMA clauses.
+3. **Demo 3 — Ambiguous Question -> Clarification -> Answer:** Prompts for order reference when asked *"I want to cancel it"* without guessing.
+4. **Demo 4 — Unsupported Question -> Abstention -> Human Support:** Safely abstains on Martian crypto queries without hallucinating and offers human escalation.
+5. **Demo 5 — Prompt Injection -> Blocked -> Normal Conversation Continues:** Rebuffs system prompt extraction and safely handles subsequent shipping inquiries in the same session.
+6. **Demo 6 — Important Action -> Confirmation -> Backend Result:** Halts cancellation of `#Nova-9876` for explicit confirmation, cancels order in SQLite database, and confirms cancellation.
+7. **Demo 7 — Long Conversation -> Summary -> Context Preserved:** Tracks long conversation (>4 turns) and stores compact summary in SQLite session record.
+8. **Demo 8 — Tamil/Tanglish Question -> Intent Detection -> RAG -> Safe Answer:** Accurately routes Tanglish query (*"Refund policy enna? damaged product return panna mudiyuma?"*) to English policy vector search and delivers safe answer.
+
+

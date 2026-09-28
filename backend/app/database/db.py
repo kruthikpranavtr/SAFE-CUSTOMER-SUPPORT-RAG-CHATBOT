@@ -189,6 +189,19 @@ def init_db():
     );
     """)
 
+    # 13. orders (Real Customer Support Orders)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS orders (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        product_name TEXT,
+        status TEXT,
+        total_amount REAL,
+        can_cancel INTEGER DEFAULT 1,
+        created_at TEXT
+    );
+    """)
+
     # Schema migration helper for existing databases
     def _add_col_if_missing(table_name: str, col_name: str, col_def: str):
         cursor.execute(f"PRAGMA table_info({table_name})")
@@ -196,17 +209,36 @@ def init_db():
         if col_name not in existing:
             cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_def}")
 
+    _add_col_if_missing("chat_sessions", "summary", "TEXT")
+    _add_col_if_missing("chat_sessions", "last_intent", "TEXT")
+    _add_col_if_missing("chat_sessions", "active_topic", "TEXT")
     _add_col_if_missing("messages", "language", "TEXT DEFAULT 'en'")
     _add_col_if_missing("messages", "evidence_items", "TEXT")
     _add_col_if_missing("messages", "status", "TEXT DEFAULT 'SUPPORTED'")
     _add_col_if_missing("messages", "guardrail_flags", "TEXT")
     _add_col_if_missing("messages", "action_confirmation", "TEXT")
     _add_col_if_missing("messages", "pii_warning", "TEXT")
+    _add_col_if_missing("messages", "intent", "TEXT")
+    _add_col_if_missing("messages", "suggestions", "TEXT")
+    _add_col_if_missing("messages", "rewritten_query", "TEXT")
     _add_col_if_missing("study_sessions", "study_condition", "TEXT DEFAULT 'B'")
     _add_col_if_missing("study_responses", "study_condition", "TEXT DEFAULT 'B'")
     _add_col_if_missing("study_responses", "evidence_viewed", "INTEGER DEFAULT 0")
 
     now = datetime.now(timezone.utc).isoformat()
+
+    # Seed mock orders
+    cursor.execute("SELECT count(*) as cnt FROM orders")
+    if cursor.fetchone()["cnt"] == 0:
+        orders_seed = [
+            ("Nova-9876", "demo-user", "NovaBook Ultra 14 (32GB RAM / 1TB SSD)", "Processing", 1299.99, 1, now),
+            ("Nova-1024", "demo-user", "NovaBook GaN 100W Fast Charger", "Shipped", 49.99, 0, now),
+            ("Nova-5521", "demo-user", "NovaBook Premium Protective Sleeve", "Delivered", 29.99, 0, now)
+        ]
+        cursor.executemany(
+            "INSERT INTO orders (id, user_id, product_name, status, total_amount, can_cancel, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            orders_seed
+        )
 
     # Default demo user
     cursor.execute("SELECT id FROM users WHERE id = 'demo-user'")

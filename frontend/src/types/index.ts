@@ -37,6 +37,9 @@ export interface ChatMessage {
   verification_notice?: string | null;
   retrieval_score?: number | null;
   language?: string;
+  intent?: string | null;
+  suggestions?: string[];
+  rewritten_query?: string | null;
   created_at: string;
 }
 
@@ -44,6 +47,7 @@ export interface ChatSessionInfo {
   id: string;
   user_id: string;
   title: string;
+  summary?: string | null;
   created_at: string;
   updated_at: string;
   messages?: ChatMessage[];

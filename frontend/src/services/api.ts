@@ -54,6 +54,24 @@ export const api = {
     return handleResponse<ChatSessionInfo>(res);
   },
 
+  async renameSession(sessionId: string, title: string): Promise<ChatSessionInfo> {
+    const res = await fetch(`${API_BASE}/chat/sessions/${sessionId}/rename`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title })
+    });
+    return handleResponse<ChatSessionInfo>(res);
+  },
+
+  async regenerateMessage(sessionId: string, language: string = 'en'): Promise<ChatMessage> {
+    const res = await fetch(`${API_BASE}/chat/regenerate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, language })
+    });
+    return handleResponse<ChatMessage>(res);
+  },
+
   async deleteSession(sessionId: string): Promise<{ status: string }> {
     const res = await fetch(`${API_BASE}/chat/sessions/${sessionId}`, {
       method: 'DELETE'

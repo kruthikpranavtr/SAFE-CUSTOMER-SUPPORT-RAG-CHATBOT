@@ -18,7 +18,18 @@ import {
   ShieldAlert,
   Clock,
   UserCheck,
-  Languages
+  Languages,
+  Copy,
+  Check,
+  RotateCcw,
+  Edit2,
+  Search,
+  BookOpen,
+  Package,
+  Truck,
+  RotateCcw as ReturnIcon,
+  DollarSign,
+  Shield
 } from 'lucide-react';
 import { api } from '../services/api';
 import { ChatMessage, ChatSessionInfo, SourceItem, EvidenceItem } from '../types';
@@ -27,21 +38,29 @@ import { FeedbackModal } from '../components/FeedbackModal';
 import { EvidenceModal } from '../components/EvidenceModal';
 import { EscalationModal } from '../components/EscalationModal';
 
+const CATEGORY_CARDS = [
+  { id: 'orders', label: 'Orders', icon: Package, sample: 'Where is my order #Nova-9876?' },
+  { id: 'delivery', label: 'Delivery', icon: Truck, sample: 'How long does standard delivery take?' },
+  { id: 'returns', label: 'Returns', icon: ReturnIcon, sample: 'How can I return an item?' },
+  { id: 'refunds', label: 'Refunds', icon: DollarSign, sample: 'What is your refund policy window?' },
+  { id: 'warranty', label: 'Warranty', icon: Shield, sample: 'What does the 1-year warranty cover?' }
+];
+
 const SUGGESTED_QUESTIONS_EN = [
-  "How long do I have to request a refund?",
-  "How long does standard shipping take?",
-  "What is the warranty period for refurbished units?",
+  "What is your refund policy?",
+  "How long does standard delivery take?",
   "Can I cancel my order within 60 minutes?",
-  "Do you support international returns?",
-  "What is the cryptocurrency payment policy?"
+  "What does the 1-year warranty cover?",
+  "What is the status of my order #Nova-9876?",
+  "Can I return an item without original packaging?"
 ];
 
 const SUGGESTED_QUESTIONS_TA = [
   "பணம் திரும்பப் பெறுவதற்கான விதிமுறைகள் என்ன?",
   "டெலிவரி எத்தனை நாட்களில் வரும்?",
+  "ஆர்டர் செய்த பிறகு ரத்து செய்ய முடியுமா?",
   "பழைய/புதுப்பிக்கப்பட்ட சாதனங்களுக்கு உத்தரவாதம் உண்டா?",
-  "ஆர்டரை ரத்து செய்வது எப்படி?",
-  "செவ்வாய் கிரகத்தில் கிரிப்டோகரன்சி பரிவர்த்தனை செய்யலாமா?"
+  "சேதமடைந்த பொருளுக்கு ரீஃபண்ட் கிடைக்குமா?"
 ];
 
 interface ChatPageProps {
@@ -55,17 +74,26 @@ export const ChatPage: React.FC<ChatPageProps> = ({
 }) => {
   const [sessions, setSessions] = useState<ChatSessionInfo[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [currentSessionSummary, setCurrentSessionSummary] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const [isDeletingHistory, setIsDeletingHistory] = useState(false);
+  
+  // Search & rename state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   // Modals state
   const [activeSource, setActiveSource] = useState<SourceItem | null>(null);
   const [feedbackTarget, setFeedbackTarget] = useState<{ sessionId: string; messageId: string } | null>(null);
   const [feedbackSubmittedIds, setFeedbackSubmittedIds] = useState<Record<string, string>>({});
+  const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
   
   // Evidence & Escalation modals
   const [evidenceModalData, setEvidenceModalData] = useState<{
@@ -104,6 +132,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     try {
       const session = await api.getSession(sessionId);
       setMessages(session.messages || []);
+      setCurrentSessionSummary(session.summary || null);
     } catch (err: any) {
       setError('Failed to load chat history.');
     } finally {
@@ -113,6 +142,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
 
   const startNewChat = () => {
     setCurrentSessionId(null);
+    setCurrentSessionSummary(null);
     setMessages([]);
     setError(null);
   };
@@ -131,16 +161,37 @@ export const ChatPage: React.FC<ChatPageProps> = ({
   };
 
   const toggleSelectAll = () => {
-    if (selectedSessionIds.size === sessions.length) {
+    if (selectedSessionIds.size === filteredSessions.length) {
       setSelectedSessionIds(new Set());
     } else {
-      setSelectedSessionIds(new Set(sessions.map((s) => s.id)));
+      setSelectedSessionIds(new Set(filteredSessions.map((s) => s.id)));
+    }
+  };
+
+  const handleStartRename = (s: ChatSessionInfo, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSessionId(s.id);
+    setEditingTitle(s.title);
+  };
+
+  const handleSaveRename = async (sessionId: string, e?: React.MouseEvent | React.FormEvent) => {
+    if (e) e.stopPropagation();
+    if (!editingTitle.trim()) {
+      setEditingSessionId(null);
+      return;
+    }
+    try {
+      await api.renameSession(sessionId, editingTitle.trim());
+      setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, title: editingTitle.trim() } : s));
+      setEditingSessionId(null);
+    } catch (err: any) {
+      console.error('Rename failed:', err);
     }
   };
 
   const deleteSingleSession = async (sessionId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (!window.confirm('Delete this inquiry from history?')) return;
+    if (!window.confirm('Delete this conversation from history?')) return;
     try {
       await api.deleteSession(sessionId);
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
@@ -197,11 +248,6 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     }
   };
 
-  const deleteCurrentSession = async () => {
-    if (!currentSessionId) return;
-    deleteSingleSession(currentSessionId);
-  };
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -241,10 +287,41 @@ export const ChatPage: React.FC<ChatPageProps> = ({
 
       setMessages((prev) => [...prev, aiResponse]);
     } catch (err: any) {
-      setError(err.message || 'Failed to get answer from assistant.');
+      setError('I’m having trouble generating a response right now. Please try again.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRegenerate = async () => {
+    if (!currentSessionId || isRegenerating || isLoading) return;
+    setIsRegenerating(true);
+    setError(null);
+    try {
+      const updatedAiMsg = await api.regenerateMessage(currentSessionId, language);
+      // Replace last AI message
+      setMessages((prev) => {
+        const withoutLastAi = [...prev];
+        const lastIdx = withoutLastAi.map(m => m.role).lastIndexOf('assistant');
+        if (lastIdx !== -1) {
+          withoutLastAi[lastIdx] = updatedAiMsg;
+          return withoutLastAi;
+        }
+        return [...prev, updatedAiMsg];
+      });
+    } catch (err: any) {
+      setError('Failed to regenerate response. Please try again.');
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const handleCopyMessage = (text: string, msgId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedMessageId(msgId);
+    setTimeout(() => {
+      setCopiedMessageId(null);
+    }, 2000);
   };
 
   const handleHelpfulClick = async (sessionId: string, messageId: string) => {
@@ -264,28 +341,28 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     const confUpper = (confidence || '').toUpperCase();
     if (confUpper.includes('HIGH')) {
       return (
-        <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <div className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
           <span>Evidence Support: HIGH</span>
         </div>
       );
     } else if (confUpper.includes('MEDIUM') || confUpper.includes('MODERATE')) {
       return (
-        <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+        <div className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
           <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
           <span>Evidence Support: MEDIUM</span>
         </div>
       );
     } else if (confUpper.includes('LOW')) {
       return (
-        <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
+        <div className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
           <AlertTriangle className="w-3.5 h-3.5 text-orange-600" />
           <span>Evidence Support: LOW</span>
         </div>
       );
     } else {
       return (
-        <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+        <div className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
           <HelpCircle className="w-3.5 h-3.5 text-rose-600" />
           <span>Evidence Support: UNABLE TO DETERMINE</span>
         </div>
@@ -293,32 +370,62 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     }
   };
 
+  // Group sessions by date
+  const filteredSessions = sessions.filter(s => 
+    s.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const groupSessions = () => {
+    const today = new Date().toDateString();
+    const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+    const groups: { today: ChatSessionInfo[]; yesterday: ChatSessionInfo[]; previous: ChatSessionInfo[] } = {
+      today: [],
+      yesterday: [],
+      previous: []
+    };
+
+    filteredSessions.forEach(s => {
+      const d = new Date(s.updated_at).toDateString();
+      if (d === today) {
+        groups.today.push(s);
+      } else if (d === yesterday) {
+        groups.yesterday.push(s);
+      } else {
+        groups.previous.push(s);
+      }
+    });
+
+    return groups;
+  };
+
+  const grouped = groupSessions();
   const activeQuestions = language === 'ta' ? SUGGESTED_QUESTIONS_TA : SUGGESTED_QUESTIONS_EN;
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-140px)]">
-      {/* Sidebar: Conversation Sessions & Safe AI Banner */}
+      {/* ===================== SIDEBAR ===================== */}
       <div className="w-full lg:w-72 shrink-0 flex flex-col space-y-4">
         {/* New Chat Button */}
         <button
           onClick={startNewChat}
-          className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-md shadow-blue-500/10 transition"
+          className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md shadow-blue-500/10 transition"
         >
           <PlusCircle className="w-4 h-4" />
-          <span>New Customer Inquiry</span>
+          <span>+ New Customer Inquiry</span>
         </button>
 
         {/* Language selector in sidebar */}
         {onLanguageChange && (
           <div className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-xs">
             <span className="text-slate-600 font-medium flex items-center gap-1.5">
-              <Languages className="w-4 h-4 text-slate-400" /> Response Language:
+              <Languages className="w-4 h-4 text-slate-400" /> Language:
             </span>
             <div className="flex gap-1">
               <button
                 type="button"
                 onClick={() => onLanguageChange('en')}
-                className={`px-2 py-0.5 rounded font-medium ${
+                className={`px-2.5 py-0.5 rounded font-medium ${
                   language === 'en' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-100'
                 }`}
               >
@@ -327,7 +434,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
               <button
                 type="button"
                 onClick={() => onLanguageChange('ta')}
-                className={`px-2 py-0.5 rounded font-medium ${
+                className={`px-2.5 py-0.5 rounded font-medium ${
                   language === 'ta' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-100'
                 }`}
               >
@@ -338,19 +445,19 @@ export const ChatPage: React.FC<ChatPageProps> = ({
         )}
 
         {/* Automation Bias / Safety Mitigation Box */}
-        <div className="p-4 bg-amber-50/70 border border-amber-200/80 rounded-2xl text-xs text-amber-900 space-y-2">
+        <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-2xl text-xs text-amber-900 space-y-1.5">
           <div className="flex items-center space-x-2 font-semibold text-amber-950">
             <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
             <span>Automation Bias Warning</span>
           </div>
           <p className="text-[11px] leading-relaxed text-amber-800">
-            AI answers may contain errors. Always check the cited sources and company policy before making binding customer decisions.
+            AI answers may contain errors. Always inspect cited sources before making binding decisions.
           </p>
         </div>
 
-        {/* Sessions List with Checkbox Selection and Bulk Deletion */}
+        {/* Sessions List Container */}
         <div className="bg-white rounded-2xl border border-slate-200 p-3 flex-1 flex flex-col shadow-sm">
-          {/* Header */}
+          {/* Header & Clear All */}
           <div className="flex items-center justify-between px-2 py-1 mb-2 border-b border-slate-100">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               Inquiry History {sessions.length > 0 && `(${sessions.length})`}
@@ -369,19 +476,31 @@ export const ChatPage: React.FC<ChatPageProps> = ({
             )}
           </div>
 
+          {/* Search Conversations Input */}
+          <div className="relative mb-2">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search conversations..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
           {/* Bulk Selection Toolbar */}
-          {sessions.length > 0 && (
-            <div className="px-2.5 py-1.5 mb-2 bg-slate-50/80 rounded-xl border border-slate-200/80 flex items-center justify-between text-xs">
+          {filteredSessions.length > 0 && (
+            <div className="px-2.5 py-1.5 mb-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
               <label className="flex items-center space-x-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
-                  checked={sessions.length > 0 && selectedSessionIds.size === sessions.length}
+                  checked={filteredSessions.length > 0 && selectedSessionIds.size === filteredSessions.length}
                   onChange={toggleSelectAll}
                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
                 />
                 <span className="text-[11px] text-slate-600 font-medium">
                   {selectedSessionIds.size > 0
-                    ? `${selectedSessionIds.size} of ${sessions.length} selected`
+                    ? `${selectedSessionIds.size} of ${filteredSessions.length} selected`
                     : 'Select All'}
                 </span>
               </label>
@@ -392,7 +511,6 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                   onClick={handleBulkDelete}
                   disabled={isDeletingHistory}
                   className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[11px] font-semibold transition shadow-sm"
-                  title="Delete checked inquiries"
                 >
                   <Trash2 className="w-3 h-3" />
                   <span>Delete ({selectedSessionIds.size})</span>
@@ -401,56 +519,101 @@ export const ChatPage: React.FC<ChatPageProps> = ({
             </div>
           )}
 
-          {/* Sessions List */}
-          <div className="space-y-1 overflow-y-auto max-h-[300px]">
-            {sessions.length === 0 ? (
+          {/* Date Grouped Sessions */}
+          <div className="space-y-3 overflow-y-auto max-h-[340px] pr-1">
+            {filteredSessions.length === 0 ? (
               <p className="text-xs text-slate-400 p-2 text-center italic">
-                No past inquiries found.
+                {searchQuery ? 'No matching inquiries found.' : 'No past inquiries found.'}
               </p>
             ) : (
-              sessions.map((s) => {
-                const isSelected = selectedSessionIds.has(s.id);
-                const isCurrent = currentSessionId === s.id;
+              (['today', 'yesterday', 'previous'] as const).map((groupKey) => {
+                const groupList = grouped[groupKey];
+                if (groupList.length === 0) return null;
+                const groupTitle = groupKey === 'today' ? 'Today' : (groupKey === 'yesterday' ? 'Yesterday' : 'Previous Inquiries');
+
                 return (
-                  <div
-                    key={s.id}
-                    className={`group w-full px-2 py-1.5 rounded-xl text-xs transition flex items-center space-x-2 border ${
-                      isCurrent
-                        ? 'bg-blue-50/90 text-blue-700 border-blue-200 font-medium'
-                        : isSelected
-                        ? 'bg-slate-100 text-slate-800 border-blue-200'
-                        : 'text-slate-600 border-transparent hover:bg-slate-50'
-                    }`}
-                  >
-                    {/* Checkbox */}
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={(e) => toggleSelectSession(s.id, e as any)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 shrink-0 cursor-pointer"
-                      title="Select inquiry"
-                    />
+                  <div key={groupKey} className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 block">
+                      {groupTitle}
+                    </span>
+                    {groupList.map((s) => {
+                      const isSelected = selectedSessionIds.has(s.id);
+                      const isCurrent = currentSessionId === s.id;
+                      const isEditing = editingSessionId === s.id;
 
-                    {/* Inquiry title & switch button */}
-                    <button
-                      type="button"
-                      onClick={() => selectSession(s.id)}
-                      className="flex-1 text-left flex items-center space-x-2 min-w-0"
-                    >
-                      <Clock className="w-3.5 h-3.5 shrink-0 opacity-60" />
-                      <span className="truncate">{s.title || 'Inquiry'}</span>
-                    </button>
+                      return (
+                        <div
+                          key={s.id}
+                          className={`group w-full px-2 py-1.5 rounded-xl text-xs transition flex items-center space-x-2 border ${
+                            isCurrent
+                              ? 'bg-blue-50 text-blue-700 border-blue-200 font-semibold'
+                              : isSelected
+                              ? 'bg-slate-100 text-slate-800 border-blue-200'
+                              : 'text-slate-600 border-transparent hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => toggleSelectSession(s.id, e as any)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 shrink-0 cursor-pointer"
+                          />
 
-                    {/* Quick single delete trash icon */}
-                    <button
-                      type="button"
-                      onClick={(e) => deleteSingleSession(s.id, e)}
-                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-600 p-1 rounded transition shrink-0"
-                      title="Delete this inquiry"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                          {isEditing ? (
+                            <form 
+                              onSubmit={(e) => { e.preventDefault(); handleSaveRename(s.id); }}
+                              className="flex-1 flex items-center space-x-1"
+                            >
+                              <input
+                                type="text"
+                                value={editingTitle}
+                                onChange={(e) => setEditingTitle(e.target.value)}
+                                className="flex-1 px-1.5 py-0.5 text-xs rounded border border-blue-300 bg-white"
+                                autoFocus
+                              />
+                              <button
+                                type="submit"
+                                className="text-emerald-600 hover:text-emerald-800 p-0.5"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                            </form>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => selectSession(s.id)}
+                              className="flex-1 text-left flex items-center space-x-1.5 min-w-0"
+                            >
+                              <Clock className="w-3.5 h-3.5 shrink-0 opacity-50" />
+                              <span className="truncate">{s.title || 'Inquiry'}</span>
+                            </button>
+                          )}
+
+                          {/* Action icons */}
+                          {!isEditing && (
+                            <div className="flex items-center opacity-0 group-hover:opacity-100 transition space-x-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => handleStartRename(s, e)}
+                                className="text-slate-400 hover:text-slate-700 p-0.5 rounded"
+                                title="Rename inquiry"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => deleteSingleSession(s.id, e)}
+                                className="text-slate-400 hover:text-red-600 p-0.5 rounded"
+                                title="Delete inquiry"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })
@@ -459,30 +622,42 @@ export const ChatPage: React.FC<ChatPageProps> = ({
         </div>
       </div>
 
-      {/* Main Chat Conversation Screen */}
+      {/* ===================== MAIN CHAT DISPLAY ===================== */}
       <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
         {/* Chat Header */}
         <div className="px-6 py-3.5 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
-              <Bot className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shadow-inner">
+              <Bot className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h2 className="font-semibold text-xs sm:text-sm text-slate-800">
-                  AI Customer Support Assistant
+                <h2 className="font-bold text-xs sm:text-sm text-slate-800">
+                  SafeSupport AI — Customer Assistant
                 </h2>
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800">
-                  Online • Grounded RAG
+                  Active • Grounded RAG
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">
-                Non-human AI assistant. All responses derived from company knowledge base.
+              <p className="text-[11px] text-slate-500">
+                Evidence-verified customer support assistant.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Conversation Summary Button if present */}
+            {currentSessionSummary && (
+              <button
+                onClick={() => setShowSummaryModal(true)}
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition"
+                title="View Compact Conversation Summary"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Session Summary</span>
+              </button>
+            )}
+
             <button
               onClick={() => {
                 const lastUser = [...messages].reverse().find((m) => m.role === 'user');
@@ -503,46 +678,71 @@ export const ChatPage: React.FC<ChatPageProps> = ({
         {/* Messages List Area */}
         <div className="flex-1 p-6 overflow-y-auto space-y-6">
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto py-10 space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Bot className="w-6 h-6" />
+            /* ===================== WELCOME SCREEN (SECTION 45) ===================== */
+            <div className="h-full flex flex-col items-center justify-center text-center max-w-lg mx-auto py-8 space-y-6 animate-fadeIn">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <Bot className="w-7 h-7" />
               </div>
-              <div>
-                <h3 className="font-semibold text-slate-800 text-sm">
-                  Welcome to TechNova Customer Support
+              <div className="space-y-1">
+                <h3 className="font-bold text-slate-900 text-base sm:text-lg">
+                  SafeSupport AI — Your Customer Support Assistant
                 </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  I am an AI assistant here to answer questions using our verified policies on refunds, shipping, warranty, and returns.
+                <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                  I can answer customer inquiries strictly grounded in verified company policies.
                 </p>
               </div>
 
-              {/* Suggested Questions */}
-              <div className="w-full space-y-2 pt-2">
-                <span className="text-[11px] font-semibold uppercase text-slate-400 tracking-wider block mb-1">
-                  Sample Inquiries to Test:
+              {/* Clickable Category Chips */}
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                {CATEGORY_CARDS.map((cat) => {
+                  const Icon = cat.icon;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => handleSendMessage(cat.sample)}
+                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 border border-slate-200 text-slate-700 text-xs font-medium transition"
+                    >
+                      <Icon className="w-3.5 h-3.5 text-blue-600" />
+                      <span>{cat.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Sample Question Buttons */}
+              <div className="w-full space-y-2 pt-2 text-left">
+                <span className="text-[11px] font-semibold uppercase text-slate-400 tracking-wider block mb-2 text-center">
+                  Common Customer Questions:
                 </span>
-                {activeQuestions.map((q, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSendMessage(q)}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs border border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 text-slate-700 transition flex items-center justify-between group"
-                  >
-                    <span>{q}</span>
-                    <Sparkles className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 shrink-0 ml-2" />
-                  </button>
-                ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {activeQuestions.map((q, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSendMessage(q)}
+                      className="p-3 rounded-xl text-xs border border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 text-slate-700 transition flex items-start justify-between group shadow-sm bg-white"
+                    >
+                      <span className="font-medium text-slate-800 leading-snug">{q}</span>
+                      <Sparkles className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 shrink-0 ml-1.5 mt-0.5" />
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
+            /* ===================== CONVERSATION TURNS ===================== */
             messages.map((msg) => {
               const isUser = msg.role === 'user';
               const feedbackState = feedbackSubmittedIds[msg.id];
+              const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
               if (isUser) {
                 return (
-                  <div key={msg.id} className="flex items-start justify-end space-x-2">
-                    <div className="max-w-xl bg-blue-600 text-white rounded-2xl rounded-tr-none px-4 py-3 shadow-sm text-xs sm:text-sm leading-relaxed">
-                      {msg.content}
+                  <div key={msg.id} className="flex items-start justify-end space-x-2 animate-fadeIn">
+                    <div className="space-y-1 text-right">
+                      <div className="max-w-xl bg-blue-600 text-white rounded-2xl rounded-tr-none px-4 py-3 shadow-sm text-xs sm:text-sm leading-relaxed text-left">
+                        {msg.content}
+                      </div>
+                      <span className="text-[10px] text-slate-400 block px-1">{timeStr}</span>
                     </div>
                     <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
                       <User className="w-4 h-4" />
@@ -552,18 +752,18 @@ export const ChatPage: React.FC<ChatPageProps> = ({
               }
 
               return (
-                <div key={msg.id} className="flex items-start space-x-3">
-                  <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 border border-slate-200 mt-1">
-                    <Bot className="w-4 h-4" />
+                <div key={msg.id} className="flex items-start space-x-3 animate-fadeIn">
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 border border-slate-200 mt-1 shadow-sm">
+                    <Bot className="w-4 h-4 text-blue-600" />
                   </div>
-                  <div className="max-w-2xl w-full bg-slate-50/80 border border-slate-200/80 rounded-2xl rounded-tl-none p-4 sm:p-5 shadow-sm space-y-4">
+                  <div className="max-w-2xl w-full bg-slate-50/90 border border-slate-200 rounded-2xl rounded-tl-none p-4 sm:p-5 shadow-sm space-y-4">
                     {/* Assistant Header & Confidence Pill */}
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-3">
                       <div className="flex items-center space-x-2">
-                        <span className="font-semibold text-xs text-slate-800">
+                        <span className="font-bold text-xs text-slate-900">
                           AI Customer Support Assistant
                         </span>
-                        <span className="text-[11px] text-slate-400">• Non-human AI model</span>
+                        <span className="text-[10px] text-slate-400">• {timeStr}</span>
                       </div>
                       {renderConfidenceBadge(msg.confidence)}
                     </div>
@@ -594,14 +794,14 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                         <div className="flex items-center gap-2 pt-1">
                           <button
                             type="button"
-                            onClick={() => handleSendMessage(`Confirm ${msg.action_confirmation?.action_name} for ${msg.action_confirmation?.target_identifier}`)}
+                            onClick={() => handleSendMessage("Confirm Order Cancellation")}
                             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition"
                           >
                             Confirm {msg.action_confirmation.action_name}
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleSendMessage(`Go back, do not proceed with ${msg.action_confirmation?.action_name}`)}
+                            onClick={() => handleSendMessage("Keep my order, do not cancel")}
                             className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-medium transition"
                           >
                             Go Back
@@ -684,22 +884,79 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                       </div>
                     )}
 
-                    {/* Feedback & Escalation Action Row */}
-                    <div className="pt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 border-t border-slate-200/50">
-                      <button
-                        onClick={() => {
-                          const lastUser = [...messages].reverse().find((m) => m.role === 'user');
-                          setEscalationData({
-                            userQuestion: lastUser?.content || '',
-                            lastAiAnswer: msg.content
-                          });
-                        }}
-                        className="inline-flex items-center space-x-1 text-slate-600 hover:text-amber-700 font-medium transition"
-                      >
-                        <UserCheck className="w-3.5 h-3.5" />
-                        <span>Escalate to Human Agent</span>
-                      </button>
+                    {/* Follow-Up Suggestion Chips (SECTION 46) */}
+                    {msg.suggestions && msg.suggestions.length > 0 && (
+                      <div className="pt-2 border-t border-slate-200/50 space-y-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                          Suggested Questions:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {msg.suggestions.map((s, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => handleSendMessage(s)}
+                              className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-blue-50/80 hover:bg-blue-100 text-blue-700 text-xs font-medium border border-blue-200 transition"
+                            >
+                              <Sparkles className="w-3 h-3 text-blue-500" />
+                              <span>{s}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
+                    {/* Action Toolbar: Copy, Regenerate, Feedback, Escalate (SECTIONS 42 & 43) */}
+                    <div className="pt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 border-t border-slate-200/50">
+                      <div className="flex items-center space-x-2">
+                        {/* Copy button */}
+                        <button
+                          type="button"
+                          onClick={() => handleCopyMessage(msg.content, msg.id)}
+                          className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition"
+                          title="Copy response to clipboard"
+                        >
+                          {copiedMessageId === msg.id ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              <span className="text-emerald-700 font-semibold">Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+
+                        {/* Regenerate button */}
+                        <button
+                          type="button"
+                          onClick={handleRegenerate}
+                          disabled={isRegenerating || isLoading}
+                          className="inline-flex items-center space-x-1 px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition disabled:opacity-50"
+                          title="Regenerate with safety guardrails"
+                        >
+                          <RotateCcw className={`w-3.5 h-3.5 ${isRegenerating ? 'animate-spin' : ''}`} />
+                          <span>Regenerate</span>
+                        </button>
+
+                        {/* Escalate button */}
+                        <button
+                          onClick={() => {
+                            const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+                            setEscalationData({
+                              userQuestion: lastUser?.content || '',
+                              lastAiAnswer: msg.content
+                            });
+                          }}
+                          className="inline-flex items-center space-x-1 text-slate-600 hover:text-amber-700 font-medium transition px-2 py-1"
+                        >
+                          <UserCheck className="w-3.5 h-3.5" />
+                          <span>Escalate</span>
+                        </button>
+                      </div>
+
+                      {/* Feedback Buttons */}
                       <div className="flex items-center space-x-2">
                         <span className="text-[11px] text-slate-400">Helpful?</span>
                         <button
@@ -734,29 +991,37 @@ export const ChatPage: React.FC<ChatPageProps> = ({
             })
           )}
 
-          {/* Loading Indicator */}
-          {isLoading && (
+          {/* Realistic Typing Indicator (SECTION 41) */}
+          {(isLoading || isRegenerating) && (
             <div className="flex items-start space-x-3 animate-fadeIn">
               <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200 shrink-0">
                 <Bot className="w-4 h-4" />
               </div>
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl rounded-tl-none p-4 text-xs text-slate-600 space-y-2">
-                <div className="flex items-center space-x-2 text-blue-600 font-medium">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl rounded-tl-none p-3.5 text-xs text-slate-600 space-y-1">
+                <div className="flex items-center space-x-2 text-blue-700 font-medium">
                   <div className="flex space-x-1">
-                    <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                    <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                    <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"></span>
+                    <span className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                    <span className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                    <span className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></span>
                   </div>
-                  <span>Searching indexed policies & verifying evidence...</span>
+                  <span>SafeSupport AI is retrieving verified policy evidence...</span>
                 </div>
               </div>
             </div>
           )}
 
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center space-x-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+              <button
+                onClick={() => handleSendMessage()}
+                className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold"
+              >
+                Retry
+              </button>
             </div>
           )}
 
@@ -781,12 +1046,12 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                   ? 'வாடிக்கையாளர் ஆதரவு கேள்வியைக் கேட்கவும் (எ.கா. பணம் திரும்பப் பெறுதல், ஷிப்பிங்)...'
                   : 'Ask a customer support question (e.g., refund policies, shipping times, warranty)...'
               }
-              disabled={isLoading}
+              disabled={isLoading || isRegenerating}
               className="flex-1 text-xs sm:text-sm px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50/50"
             />
             <button
               type="submit"
-              disabled={isLoading || !inputValue.trim()}
+              disabled={isLoading || isRegenerating || !inputValue.trim()}
               className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium text-xs sm:text-sm transition flex items-center space-x-1.5 shadow-sm"
             >
               <span>Send</span>
@@ -794,11 +1059,13 @@ export const ChatPage: React.FC<ChatPageProps> = ({
             </button>
           </form>
           <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Press Enter to send. Clear attribution provided for every response.</span>
-            <span className="hidden sm:inline">Non-human AI Customer Support Assistant</span>
+            <span>Press Enter to send. Strictly fact-grounded in company documentation.</span>
+            <span className="hidden sm:inline">SafeSupport AI Customer Assistant</span>
           </div>
         </div>
       </div>
+
+      {/* ===================== MODALS ===================== */}
 
       {/* Source Inspection Modal */}
       {activeSource && (
@@ -840,6 +1107,39 @@ export const ChatPage: React.FC<ChatPageProps> = ({
             }));
           }}
         />
+      )}
+
+      {/* Compact Conversation Summary Modal (SECTION 33) */}
+      {showSummaryModal && currentSessionSummary && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center space-x-2">
+                <BookOpen className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-bold text-sm text-slate-900">Compact Conversation Summary</h3>
+              </div>
+              <button
+                onClick={() => setShowSummaryModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs font-mono text-slate-800 leading-relaxed whitespace-pre-wrap">
+              {currentSessionSummary}
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowSummaryModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold"
+              >
+                Close Summary
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
