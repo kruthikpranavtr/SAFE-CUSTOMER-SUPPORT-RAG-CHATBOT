@@ -58,6 +58,22 @@ export const api = {
     return handleResponse<{ status: string }>(res);
   },
 
+  async bulkDeleteSessions(sessionIds: string[]): Promise<{ status: string; deleted_count: number }> {
+    const res = await fetch(`${API_BASE}/chat/sessions/bulk-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_ids: sessionIds })
+    });
+    return handleResponse<{ status: string; deleted_count: number }>(res);
+  },
+
+  async clearAllSessions(): Promise<{ status: string; deleted_count: number }> {
+    const res = await fetch(`${API_BASE}/chat/sessions/clear-all`, {
+      method: 'DELETE'
+    });
+    return handleResponse<{ status: string; deleted_count: number }>(res);
+  },
+
   // Documents
   async getDocuments(): Promise<DocumentInfo[]> {
     const res = await fetch(`${API_BASE}/documents`);

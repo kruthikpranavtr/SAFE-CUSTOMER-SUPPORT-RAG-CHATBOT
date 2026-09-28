@@ -79,6 +79,20 @@ def run_tests():
         except Exception as e:
             errors.append(f"Chat Session Persistence: {e}")
 
+    # 6b. Test Bulk Session Deletion (Checkbox Multi-Delete)
+    try:
+        r_temp1 = requests.post(f"{BASE_BACKEND}/api/chat", json={"message": "Temporary test query 1", "user_id": "live-test-user"}, timeout=10)
+        r_temp2 = requests.post(f"{BASE_BACKEND}/api/chat", json={"message": "Temporary test query 2", "user_id": "live-test-user"}, timeout=10)
+        t_id1 = r_temp1.json()["session_id"]
+        t_id2 = r_temp2.json()["session_id"]
+        
+        r_bulk = requests.post(f"{BASE_BACKEND}/api/chat/sessions/bulk-delete", json={"session_ids": [t_id1, t_id2]}, timeout=5)
+        assert r_bulk.status_code == 200, f"Expected 200 for bulk-delete, got {r_bulk.status_code}"
+        assert r_bulk.json()["deleted_count"] == 2, f"Expected 2 deleted, got {r_bulk.json()}"
+        print("✓ Chat Bulk Session Deletion (Checkbox Multi-Select) Passed")
+    except Exception as e:
+        errors.append(f"Chat Bulk Session Deletion: {e}")
+
     # 7. Test Sources Inspection
     try:
         # Get first document chunks to find a valid chunk id

@@ -42,6 +42,9 @@ class ChatSessionInfo(BaseModel):
     updated_at: str
     messages: Optional[List[ChatMessage]] = []
 
+class BulkDeleteSessionsRequest(BaseModel):
+    session_ids: List[str]
+
 class DocumentInfo(BaseModel):
     id: str
     filename: str

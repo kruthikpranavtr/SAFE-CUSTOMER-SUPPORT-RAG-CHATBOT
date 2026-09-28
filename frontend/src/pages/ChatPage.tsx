@@ -59,6 +59,8 @@ export const ChatPage: React.FC<ChatPageProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
+  const [isDeletingHistory, setIsDeletingHistory] = useState(false);
 
   // Modals state
   const [activeSource, setActiveSource] = useState<SourceItem | null>(null);
@@ -115,15 +117,89 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     setError(null);
   };
 
-  const deleteCurrentSession = async () => {
-    if (!currentSessionId) return;
+  const toggleSelectSession = (sessionId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedSessionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+      } else {
+        next.add(sessionId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedSessionIds.size === sessions.length) {
+      setSelectedSessionIds(new Set());
+    } else {
+      setSelectedSessionIds(new Set(sessions.map((s) => s.id)));
+    }
+  };
+
+  const deleteSingleSession = async (sessionId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm('Delete this inquiry from history?')) return;
     try {
-      await api.deleteSession(currentSessionId);
-      setSessions((prev) => prev.filter((s) => s.id !== currentSessionId));
+      await api.deleteSession(sessionId);
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      setSelectedSessionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+      if (currentSessionId === sessionId) {
+        startNewChat();
+      }
+    } catch (err: any) {
+      setError('Failed to delete conversation: ' + (err.message || 'Error'));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedSessionIds.size === 0) return;
+    const count = selectedSessionIds.size;
+    const confirmMsg = count === 1
+      ? 'Delete the selected conversation?'
+      : `Are you sure you want to delete ${count} selected conversations?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsDeletingHistory(true);
+    try {
+      await api.bulkDeleteSessions(Array.from(selectedSessionIds));
+      setSessions((prev) => prev.filter((s) => !selectedSessionIds.has(s.id)));
+      if (currentSessionId && selectedSessionIds.has(currentSessionId)) {
+        startNewChat();
+      }
+      setSelectedSessionIds(new Set());
+    } catch (err: any) {
+      setError('Failed to delete selected conversations: ' + (err.message || 'Error'));
+    } finally {
+      setIsDeletingHistory(false);
+    }
+  };
+
+  const handleClearAllHistory = async () => {
+    if (sessions.length === 0) return;
+    if (!window.confirm(`Are you sure you want to permanently delete ALL ${sessions.length} conversations? This cannot be undone.`)) return;
+
+    setIsDeletingHistory(true);
+    try {
+      await api.clearAllSessions();
+      setSessions([]);
+      setSelectedSessionIds(new Set());
       startNewChat();
     } catch (err: any) {
-      setError('Failed to delete conversation.');
+      setError('Failed to clear chat history: ' + (err.message || 'Error'));
+    } finally {
+      setIsDeletingHistory(false);
     }
+  };
+
+  const deleteCurrentSession = async () => {
+    if (!currentSessionId) return;
+    deleteSingleSession(currentSessionId);
   };
 
   const scrollToBottom = () => {
@@ -273,43 +349,112 @@ export const ChatPage: React.FC<ChatPageProps> = ({
           </p>
         </div>
 
-        {/* Sessions List */}
+        {/* Sessions List with Checkbox Selection and Bulk Deletion */}
         <div className="bg-white rounded-2xl border border-slate-200 p-3 flex-1 flex flex-col shadow-sm">
+          {/* Header */}
           <div className="flex items-center justify-between px-2 py-1 mb-2 border-b border-slate-100">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Inquiry History
+              Inquiry History {sessions.length > 0 && `(${sessions.length})`}
             </span>
-            {currentSessionId && (
+            {sessions.length > 0 && (
               <button
-                onClick={deleteCurrentSession}
-                className="text-slate-400 hover:text-red-600 p-1 rounded-lg transition"
-                title="Delete current inquiry"
+                type="button"
+                onClick={handleClearAllHistory}
+                disabled={isDeletingHistory}
+                className="text-[11px] text-red-500 hover:text-red-700 hover:underline transition font-medium flex items-center gap-1"
+                title="Permanently delete all chat history"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-3 h-3" />
+                <span>Clear All</span>
               </button>
             )}
           </div>
 
+          {/* Bulk Selection Toolbar */}
+          {sessions.length > 0 && (
+            <div className="px-2.5 py-1.5 mb-2 bg-slate-50/80 rounded-xl border border-slate-200/80 flex items-center justify-between text-xs">
+              <label className="flex items-center space-x-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={sessions.length > 0 && selectedSessionIds.size === sessions.length}
+                  onChange={toggleSelectAll}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
+                />
+                <span className="text-[11px] text-slate-600 font-medium">
+                  {selectedSessionIds.size > 0
+                    ? `${selectedSessionIds.size} of ${sessions.length} selected`
+                    : 'Select All'}
+                </span>
+              </label>
+
+              {selectedSessionIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  disabled={isDeletingHistory}
+                  className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[11px] font-semibold transition shadow-sm"
+                  title="Delete checked inquiries"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Delete ({selectedSessionIds.size})</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Sessions List */}
           <div className="space-y-1 overflow-y-auto max-h-[300px]">
             {sessions.length === 0 ? (
               <p className="text-xs text-slate-400 p-2 text-center italic">
                 No past inquiries found.
               </p>
             ) : (
-              sessions.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => selectSession(s.id)}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-xs transition flex items-center space-x-2 ${
-                    currentSessionId === s.id
-                      ? 'bg-blue-50 text-blue-700 font-medium'
-                      : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <Clock className="w-3.5 h-3.5 shrink-0 opacity-60" />
-                  <span className="truncate">{s.title || 'Inquiry'}</span>
-                </button>
-              ))
+              sessions.map((s) => {
+                const isSelected = selectedSessionIds.has(s.id);
+                const isCurrent = currentSessionId === s.id;
+                return (
+                  <div
+                    key={s.id}
+                    className={`group w-full px-2 py-1.5 rounded-xl text-xs transition flex items-center space-x-2 border ${
+                      isCurrent
+                        ? 'bg-blue-50/90 text-blue-700 border-blue-200 font-medium'
+                        : isSelected
+                        ? 'bg-slate-100 text-slate-800 border-blue-200'
+                        : 'text-slate-600 border-transparent hover:bg-slate-50'
+                    }`}
+                  >
+                    {/* Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => toggleSelectSession(s.id, e as any)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 shrink-0 cursor-pointer"
+                      title="Select inquiry"
+                    />
+
+                    {/* Inquiry title & switch button */}
+                    <button
+                      type="button"
+                      onClick={() => selectSession(s.id)}
+                      className="flex-1 text-left flex items-center space-x-2 min-w-0"
+                    >
+                      <Clock className="w-3.5 h-3.5 shrink-0 opacity-60" />
+                      <span className="truncate">{s.title || 'Inquiry'}</span>
+                    </button>
+
+                    {/* Quick single delete trash icon */}
+                    <button
+                      type="button"
+                      onClick={(e) => deleteSingleSession(s.id, e)}
+                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-600 p-1 rounded transition shrink-0"
+                      title="Delete this inquiry"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

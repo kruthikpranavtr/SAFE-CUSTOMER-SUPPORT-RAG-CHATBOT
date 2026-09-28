@@ -3,7 +3,14 @@ import json
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException
-from backend.app.models.schemas import ChatRequest, ChatMessage, ChatSessionInfo, SourceItem, EvidenceItem
+from backend.app.models.schemas import (
+    ChatRequest, 
+    ChatMessage, 
+    ChatSessionInfo, 
+    SourceItem, 
+    EvidenceItem,
+    BulkDeleteSessionsRequest
+)
 from backend.app.database.db import execute_query, execute_insert, execute_commit
 from backend.app.rag.rag_pipeline import rag_pipeline
 
@@ -157,6 +164,31 @@ async def get_chat_session(session_id: str):
         updated_at=sess["updated_at"],
         messages=messages
     )
+
+@router.post("/sessions/bulk-delete")
+async def bulk_delete_chat_sessions(req: BulkDeleteSessionsRequest):
+    if not req.session_ids:
+        return {"status": "success", "deleted_count": 0}
+    placeholders = ",".join(["?"] * len(req.session_ids))
+    execute_commit(f"DELETE FROM messages WHERE session_id IN ({placeholders})", tuple(req.session_ids))
+    execute_commit(f"DELETE FROM chat_sessions WHERE id IN ({placeholders})", tuple(req.session_ids))
+    return {"status": "success", "deleted_count": len(req.session_ids)}
+
+@router.delete("/sessions/clear-all")
+async def clear_all_chat_sessions(user_id: Optional[str] = "demo-user"):
+    if user_id:
+        sess_rows = execute_query("SELECT id FROM chat_sessions WHERE user_id = ?", (user_id,))
+        if sess_rows:
+            s_ids = [r["id"] for r in sess_rows]
+            placeholders = ",".join(["?"] * len(s_ids))
+            execute_commit(f"DELETE FROM messages WHERE session_id IN ({placeholders})", tuple(s_ids))
+            execute_commit("DELETE FROM chat_sessions WHERE user_id = ?", (user_id,))
+            return {"status": "success", "deleted_count": len(s_ids)}
+        return {"status": "success", "deleted_count": 0}
+    else:
+        execute_commit("DELETE FROM messages")
+        execute_commit("DELETE FROM chat_sessions")
+        return {"status": "success", "deleted_count": "all"}
 
 @router.delete("/sessions/{session_id}")
 async def delete_chat_session(session_id: str):

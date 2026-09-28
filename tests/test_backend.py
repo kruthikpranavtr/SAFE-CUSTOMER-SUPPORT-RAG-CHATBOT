@@ -177,3 +177,27 @@ def test_tamil_chat_response(client):
     assert data["language"] == "ta"
     assert len(data["content"]) > 10
 
+def test_bulk_delete_and_clear_all_sessions(client):
+    # Create two test sessions
+    r1 = client.post("/api/chat", json={"message": "Inquiry 1 to delete", "user_id": "test-bulk-user"})
+    r2 = client.post("/api/chat", json={"message": "Inquiry 2 to delete", "user_id": "test-bulk-user"})
+    s1 = r1.json()["session_id"]
+    s2 = r2.json()["session_id"]
+
+    # Test bulk delete with checkboxes
+    del_resp = client.post("/api/chat/sessions/bulk-delete", json={"session_ids": [s1, s2]})
+    assert del_resp.status_code == 200
+    assert del_resp.json()["deleted_count"] == 2
+
+    # Verify both are deleted
+    assert client.get(f"/api/chat/sessions/{s1}").status_code == 404
+    assert client.get(f"/api/chat/sessions/{s2}").status_code == 404
+
+    # Create another session to test clear-all
+    r3 = client.post("/api/chat", json={"message": "Inquiry 3 for clear all", "user_id": "test-clear-user"})
+    s3 = r3.json()["session_id"]
+    clear_resp = client.delete("/api/chat/sessions/clear-all?user_id=test-clear-user")
+    assert clear_resp.status_code == 200
+    assert clear_resp.json()["deleted_count"] >= 1
+    assert client.get(f"/api/chat/sessions/{s3}").status_code == 404
+
