@@ -161,8 +161,8 @@ class EvidenceConsistencyGuardrail:
         if not retrieved_chunks:
             return GuardrailStatus.UNSUPPORTED, [], "No evidence available to verify consistency."
 
-        all_evidence_text = " ".join([c.get("content_snippet", "").lower() for c in retrieved_chunks])
-        claims = cls.extract_claims(generated_answer)
+        all_evidence_text = re.sub(r'\s+', ' ', " ".join([c.get("content_snippet", "").lower() for c in retrieved_chunks]))
+        claims = [re.sub(r'\s+', ' ', clm) for clm in cls.extract_claims(generated_answer)]
 
         if not claims:
             # No specific numerical/policy claims extracted; general textual consistency

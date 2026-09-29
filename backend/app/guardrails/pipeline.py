@@ -282,7 +282,7 @@ class SafeSupportGuardrails:
         )
 
         # ---------------------------------------------------------
-        # STEP 6B: NATURAL GREETINGS (SECTION 36)
+        # STEP 6B: NATURAL GREETINGS & CONVERSATIONAL COURTESIES (SECTION 36)
         # ---------------------------------------------------------
         if intent == ConversationIntent.GREETING:
             greeting_msg = (
@@ -311,6 +311,251 @@ class SafeSupportGuardrails:
                 "suggestions": suggestions,
                 "rewritten_query": clean_query,
                 "guardrail_flags": guardrail_flags + ["CONVERSATION_GREETING"]
+            }
+
+        if intent == ConversationIntent.SMALLTALK_WELLBEING:
+            msg = (
+                "நான் நன்றாக உள்ளேன், கேட்டதற்கு நன்றி! 😊 உங்களுக்கு இன்று எவ்வாறு உதவ முடியும்? "
+                "ஆர்டர், டெலிவரி, ரீஃபண்ட் அல்லது வாரண்டி குறித்து நீங்கள் கேட்கலாம்."
+                if language == "ta" else
+                "I'm doing great, thank you for asking! 😊 I'm fully ready to assist you today. "
+                "What can I help you with regarding your orders, shipping, refunds, warranty, or returns?"
+            )
+            suggestions = SuggestionsEngine.get_suggestions(ConversationIntent.SMALLTALK_WELLBEING, language=language)
+            if session_id:
+                ConversationMemory.update_session_context(session_id, last_intent="SMALLTALK_WELLBEING")
+            return {
+                "answer": msg,
+                "status": GuardrailStatus.SUPPORTED,
+                "confidence": ConfidenceLevel.HIGH,
+                "sources": [],
+                "evidence_status": "SUPPORTED",
+                "requires_human": False,
+                "verification_required": False,
+                "verification_notice": None,
+                "pii_warning": pii_warning,
+                "action_confirmation": None,
+                "intent": intent.value,
+                "suggestions": suggestions,
+                "rewritten_query": clean_query,
+                "guardrail_flags": guardrail_flags + ["CONVERSATION_WELLBEING"]
+            }
+
+        if intent == ConversationIntent.BOT_IDENTITY:
+            msg = (
+                "நான் **சேஃப் சப்போர்ட் AI**, டெக்நோவாவின் அதிகாரப்பூர்வ வாடிக்கையாளர் ஆதரவு உதவியாளர். "
+                "நிறுவனத்தின் சரிபார்க்கப்பட்ட ஆவணங்களின் அடிப்படையில் துல்லியமான தகவல்களை வழங்குகிறேன்."
+                if language == "ta" else
+                "I am **SafeSupport AI**, an AI Customer Support Assistant for TechNova. "
+                "I provide verified, evidence-grounded answers based strictly on our official company documentation. "
+                "I can help you with store policies, product specifications, order updates, returns, and warranty claims."
+            )
+            suggestions = SuggestionsEngine.get_suggestions(ConversationIntent.BOT_IDENTITY, language=language)
+            if session_id:
+                ConversationMemory.update_session_context(session_id, last_intent="BOT_IDENTITY")
+            return {
+                "answer": msg,
+                "status": GuardrailStatus.SUPPORTED,
+                "confidence": ConfidenceLevel.HIGH,
+                "sources": [],
+                "evidence_status": "SUPPORTED",
+                "requires_human": False,
+                "verification_required": False,
+                "verification_notice": None,
+                "pii_warning": pii_warning,
+                "action_confirmation": None,
+                "intent": intent.value,
+                "suggestions": suggestions,
+                "rewritten_query": clean_query,
+                "guardrail_flags": guardrail_flags + ["CONVERSATION_IDENTITY"]
+            }
+
+        if intent == ConversationIntent.BOT_CAPABILITIES:
+            msg = (
+                "நான் உங்களுக்கு பின்வருவனவற்றில் உதவ முடியும்:\n\n"
+                "• 📦 **ஆர்டர் நிலை:** ஆர்டர் நிலை மற்றும் டெலிவரி கண்காணிப்பு (#Nova-9876 போன்றவை)\n"
+                "• 💰 **ரீஃபண்ட்:** ரீஃபண்ட் விதிமுறைகள் (7 நாட்கள் சாளரம்) மற்றும் தகுதி விவரங்கள்\n"
+                "• 🚚 **டெலிவரி:** நிலையான தரைவழி ஷிப்பிங் (3–5 வணிக நாட்கள்) மற்றும் விரைவு டெலிவரி\n"
+                "• 🔄 **ரிட்டர்ன்:** 14 நாட்கள் ரிட்டர்ன் கால அளவு மற்றும் RMA நடைமுறை\n"
+                "• 🛡️ **வாரண்டி:** 1 வருட தயாரிப்பாளர் வாரண்டி மற்றும் பழுதுபார்ப்பு விதிகள்\n"
+                "• ⏱️ **ரத்து செய்தல்:** ஆர்டர் செய்த 60 நிமிடங்களுக்குள் ரத்து செய்தல்\n"
+                "• 👤 **மனித ஆதரவு:** நேரடி மனித உதவியாளருடன் தொடர்பு\n\n"
+                "உங்களுக்கு எதில் உதவி வேண்டும்?"
+                if language == "ta" else
+                "Here is what I can help you with:\n\n"
+                "• 📦 **Orders & Tracking:** Track order statuses (e.g. `#Nova-9876`) and view live shipping updates.\n"
+                "• 💰 **Refunds:** Explain refund policies (**7 calendar days**), eligibility rules, and credit times.\n"
+                "• 🚚 **Shipping & Delivery:** Provide delivery estimates (**3–5 business days**, free over $50) and expedited options.\n"
+                "• 🔄 **Returns & Exchanges:** Guide return instructions (**14 calendar days**) and RMA procedures.\n"
+                "• 🛡️ **Warranty & Service:** Clarify warranty terms (**1-year manufacturer warranty**, 90 days for refurbished items).\n"
+                "• ⏱️ **Cancellations:** Guide instant order cancellation within the **60-minute** window.\n"
+                "• 👤 **Human Escalation:** Seamlessly connect you with a human representative whenever needed.\n\n"
+                "What would you like assistance with?"
+            )
+            suggestions = SuggestionsEngine.get_suggestions(ConversationIntent.BOT_CAPABILITIES, language=language)
+            if session_id:
+                ConversationMemory.update_session_context(session_id, last_intent="BOT_CAPABILITIES")
+            return {
+                "answer": msg,
+                "status": GuardrailStatus.SUPPORTED,
+                "confidence": ConfidenceLevel.HIGH,
+                "sources": [],
+                "evidence_status": "SUPPORTED",
+                "requires_human": False,
+                "verification_required": False,
+                "verification_notice": None,
+                "pii_warning": pii_warning,
+                "action_confirmation": None,
+                "intent": intent.value,
+                "suggestions": suggestions,
+                "rewritten_query": clean_query,
+                "guardrail_flags": guardrail_flags + ["CONVERSATION_CAPABILITIES"]
+            }
+
+        if intent == ConversationIntent.GRATITUDE:
+            msg = (
+                "மிக்க மகிழ்ச்சி! 😊 உங்களுக்கு உதவ முடிந்ததில் மகிழ்ச்சி. வேறு ஏதேனும் கேள்விகள் இருந்தால் தயங்காமல் கேட்கவும். இனிய நாளாக அமையட்டும்!"
+                if language == "ta" else
+                "You're very welcome! 😊 I'm always glad to help. If you have any other questions or need further clarification, feel free to ask anytime. Have a wonderful day!"
+            )
+            suggestions = SuggestionsEngine.get_suggestions(ConversationIntent.GRATITUDE, language=language)
+            if session_id:
+                ConversationMemory.update_session_context(session_id, last_intent="GRATITUDE")
+            return {
+                "answer": msg,
+                "status": GuardrailStatus.SUPPORTED,
+                "confidence": ConfidenceLevel.HIGH,
+                "sources": [],
+                "evidence_status": "SUPPORTED",
+                "requires_human": False,
+                "verification_required": False,
+                "verification_notice": None,
+                "pii_warning": pii_warning,
+                "action_confirmation": None,
+                "intent": intent.value,
+                "suggestions": suggestions,
+                "rewritten_query": clean_query,
+                "guardrail_flags": guardrail_flags + ["CONVERSATION_GRATITUDE"]
+            }
+
+        if intent == ConversationIntent.HELP_REQUEST:
+            msg = (
+                "நிச்சயமாக, உங்களுக்கு உதவ நான் தயாராக உள்ளேன்! உங்கள் ஆர்டர், டெலிவரி, ரீஃபண்ட், ரிட்டர்ன் அல்லது வாரண்டி குறித்த கேள்வியை என்னிடம் கேளுங்கள்."
+                if language == "ta" else
+                "I would be glad to help you! Please let me know what you need assistance with (for example, an order status, refund question, return procedure, shipping times, or warranty coverage), and I'll find the verified answer for you."
+            )
+            suggestions = SuggestionsEngine.get_suggestions(ConversationIntent.HELP_REQUEST, language=language)
+            if session_id:
+                ConversationMemory.update_session_context(session_id, last_intent="HELP_REQUEST")
+            return {
+                "answer": msg,
+                "status": GuardrailStatus.SUPPORTED,
+                "confidence": ConfidenceLevel.HIGH,
+                "sources": [],
+                "evidence_status": "SUPPORTED",
+                "requires_human": False,
+                "verification_required": False,
+                "verification_notice": None,
+                "pii_warning": pii_warning,
+                "action_confirmation": None,
+                "intent": intent.value,
+                "suggestions": suggestions,
+                "rewritten_query": clean_query,
+                "guardrail_flags": guardrail_flags + ["CONVERSATION_HELP_REQUEST"]
+            }
+
+        if intent == ConversationIntent.FAREWELL:
+            msg = (
+                "போய் வருகிறேன்! 👋 வாடிக்கையாளர் ஆதரவைத் தொடர்பு கொண்டதற்கு நன்றி. மீண்டும் எப்போது வேண்டுமானாலும் என்னைத் தொடர்பு கொள்ளலாம். இனிய நாளாக அமையட்டும்!"
+                if language == "ta" else
+                "Goodbye! 👋 Thank you for contacting customer support. If you ever have questions or need assistance again, I'm here 24/7. Have a wonderful day!"
+            )
+            suggestions = SuggestionsEngine.get_suggestions(ConversationIntent.FAREWELL, language=language)
+            if session_id:
+                ConversationMemory.update_session_context(session_id, last_intent="FAREWELL")
+            return {
+                "answer": msg,
+                "status": GuardrailStatus.SUPPORTED,
+                "confidence": ConfidenceLevel.HIGH,
+                "sources": [],
+                "evidence_status": "SUPPORTED",
+                "requires_human": False,
+                "verification_required": False,
+                "verification_notice": None,
+                "pii_warning": pii_warning,
+                "action_confirmation": None,
+                "intent": intent.value,
+                "suggestions": suggestions,
+                "rewritten_query": clean_query,
+                "guardrail_flags": guardrail_flags + ["CONVERSATION_FAREWELL"]
+            }
+
+        if intent == ConversationIntent.AFFIRMATION:
+            msg = (
+                "சரிங்க! வேறு ஏதேனும் விவரங்கள் அல்லது கேள்விகள் இருந்தால் தயங்காமல் தெரியப்படுத்தவும்."
+                if language == "ta" else
+                "Great! Let me know if there's anything else you'd like to check or if you have any other questions. I'm right here to assist."
+            )
+            suggestions = SuggestionsEngine.get_suggestions(ConversationIntent.AFFIRMATION, language=language)
+            if session_id:
+                ConversationMemory.update_session_context(session_id, last_intent="AFFIRMATION")
+            return {
+                "answer": msg,
+                "status": GuardrailStatus.SUPPORTED,
+                "confidence": ConfidenceLevel.HIGH,
+                "sources": [],
+                "evidence_status": "SUPPORTED",
+                "requires_human": False,
+                "verification_required": False,
+                "verification_notice": None,
+                "pii_warning": pii_warning,
+                "action_confirmation": None,
+                "intent": intent.value,
+                "suggestions": suggestions,
+                "rewritten_query": clean_query,
+                "guardrail_flags": guardrail_flags + ["CONVERSATION_AFFIRMATION"]
+            }
+
+        if intent == ConversationIntent.COMPANY_INFO:
+            q_low = clean_query.lower()
+            if any(w in q_low for w in ["sell", "product", "products", "offer", "device", "devices", "catalog", "தயாரிப்பு", "விற்க"]):
+                msg = (
+                    "டெக்நோவா (TechNova) பின்வரும் முதன்மை தயாரிப்புகளை வழங்குகிறது:\n\n"
+                    "• **நோவாபுக் ப்ரோ 15 (NovaBook Pro 15):** 4K OLED திரை மற்றும் 32GB RAM கொண்ட உயர் செயல்திறன் மடிக்கணினி.\n"
+                    "• **100W GaN ஃபாஸ்ட் சார்ஜர்:** சிறிய அளவிலான அதிவேக USB-C அடாப்டர்.\n"
+                    "• **பாதுகாப்பு உறைகள் & பாகங்கள்:** பிரீமியம் லேப்டாப் ஸ்லீவ்கள் மற்றும் பிற உபகரணங்கள்.\n\n"
+                    "இதன் விவரக்குறிப்புகள் அல்லது உத்தரவாதம் பற்றி மேலும் அறிய விரும்புகிறீர்களா?"
+                    if language == "ta" else
+                    "TechNova offers premium computing hardware and smart accessories, including:\n\n"
+                    "• **NovaBook Pro 15:** Flagship performance laptop with a 15.6-inch 4K OLED display, up to 32GB RAM, and 14-hour battery life.\n"
+                    "• **NovaBook 100W GaN Fast Charger:** Ultra-compact high-efficiency USB-C power delivery charger.\n"
+                    "• **Accessories:** Premium protective sleeves, USB-C multiport docks, and peripherals.\n\n"
+                    "Would you like more details on specifications, warranty coverage, or delivery times?"
+                )
+            else:
+                msg = (
+                    "டெக்நோவா (TechNova) முன்னணி நுகர்வோர் மின்னணுவியல் மற்றும் மடிக்கணினி சாதனங்களை வழங்கும் நிறுவனம் ஆகும். நாங்கள் வெளிப்படையான வாடிக்கையாளர் ஆதரவு, துல்லியமான உத்தரவாதம் மற்றும் விரைவான ஷிப்பிங் சேவைகளை வழங்குகிறோம்."
+                    if language == "ta" else
+                    "TechNova is a premier consumer electronics provider specializing in performance computing hardware (such as the NovaBook Pro 15), smart accessories, and dependable lifestyle technology. We are dedicated to providing transparent customer service with clear warranty, shipping, and return policies."
+                )
+            suggestions = SuggestionsEngine.get_suggestions(ConversationIntent.COMPANY_INFO, language=language)
+            if session_id:
+                ConversationMemory.update_session_context(session_id, last_intent="COMPANY_INFO")
+            return {
+                "answer": msg,
+                "status": GuardrailStatus.SUPPORTED,
+                "confidence": ConfidenceLevel.HIGH,
+                "sources": [],
+                "evidence_status": "SUPPORTED",
+                "requires_human": False,
+                "verification_required": False,
+                "verification_notice": None,
+                "pii_warning": pii_warning,
+                "action_confirmation": None,
+                "intent": intent.value,
+                "suggestions": suggestions,
+                "rewritten_query": clean_query,
+                "guardrail_flags": guardrail_flags + ["CONVERSATION_COMPANY_INFO"]
             }
 
         # ---------------------------------------------------------
@@ -389,7 +634,8 @@ class SafeSupportGuardrails:
         # STEP 9: LLM RESPONSE GENERATION
         # ---------------------------------------------------------
         top_chunk = candidate_chunks[0]
-        raw_answer = await self.llm.generate_response(clean_query, candidate_chunks, "High", language)
+        effective_query = rewritten_query if rewritten_query else clean_query
+        raw_answer = await self.llm.generate_response(effective_query, candidate_chunks, "High", language)
 
         # ---------------------------------------------------------
         # STEP 10: OUTPUT GUARD - ANSWER-EVIDENCE CONSISTENCY CHECK

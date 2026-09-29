@@ -4,6 +4,14 @@ from typing import Tuple, List, Optional
 
 class ConversationIntent(str, Enum):
     GREETING = "GREETING"
+    SMALLTALK_WELLBEING = "SMALLTALK_WELLBEING"
+    BOT_IDENTITY = "BOT_IDENTITY"
+    BOT_CAPABILITIES = "BOT_CAPABILITIES"
+    GRATITUDE = "GRATITUDE"
+    HELP_REQUEST = "HELP_REQUEST"
+    FAREWELL = "FAREWELL"
+    AFFIRMATION = "AFFIRMATION"
+    COMPANY_INFO = "COMPANY_INFO"
     PRODUCT_INFO = "PRODUCT_INFO"
     ORDER_STATUS = "ORDER_STATUS"
     DELIVERY = "DELIVERY"
@@ -29,6 +37,47 @@ class IntentDetector:
     GREETING_PATTERNS = [
         r'^\s*(?:hi|hello|hey|good\s+(?:morning|afternoon|evening)|howdy|greetings|hola)\b',
         r'^\s*(?:வணக்கம்|ஹலோ|ஹாய்)\b'
+    ]
+
+    WELLBEING_PATTERNS = [
+        r'^\s*(?:how\s+are\s+you|how\s+r\s+u|how\'?s\s+it\s+going|how\s+are\s+you\s+doing|how\s+do\s+you\s+do|what\'?s\s+up|how\s+is\s+your\s+day)\b',
+        r'^\s*(?:எப்படி\s+இருக்கிறீர்கள்|எப்படி\s+இருக்கீங்க|நலமா)\b'
+    ]
+
+    IDENTITY_PATTERNS = [
+        r'\b(?:who\s+are\s+you|who\s+r\s+u|what\s+is\s+your\s+name|what\'?s\s+your\s+name|what\s+are\s+you|are\s+you\s+human|are\s+you\s+an?\s+ai|are\s+you\s+a\s+bot|are\s+you\s+a\s+robot|tell\s+me\s+about\s+yourself|introduce\s+yourself|who\s+made\s+you)\b',
+        r'\b(?:நீங்கள்\s+யார்|உன்\s+பெயர்\s+என்ன|நீ\s+யார்|ரோபோவா)\b'
+    ]
+
+    CAPABILITIES_PATTERNS = [
+        r'\b(?:what\s+can\s+you\s+do|what\s+can\s+you\s+help\s+(?:me\s+)?with|how\s+can\s+you\s+help(?:\s+me)?|what\s+are\s+your\s+(?:features|capabilities)|what\s+help\s+can\s+you\s+provide|what\s+can\s+i\s+ask\s+(?:you)?)\b',
+        r'\b(?:உன்னால்\s+என்ன\s+செய்ய\s+முடியும்|என்ன\s+உதவி\s+செய்ய\s+முடியும்)\b'
+    ]
+
+    GRATITUDE_PATTERNS = [
+        r'^\s*(?:thank\s+you|thanks|thank\s+u|thx|thanks\s+a\s+lot|thank\s+you\s+so\s+much|many\s+thanks|appreciate\s+it|much\s+appreciated)\b',
+        r'^\s*(?:நன்றி|மிக்க\s+நன்றி|ரொம்ப\s+நன்றி)\b'
+    ]
+
+    HELP_REQUEST_PATTERNS = [
+        r'^\s*(?:can\s+you\s+help\s+me|could\s+you\s+help\s+me|i\s+need\s+help|help\s+me|i\s+have\s+a\s+question|i\s+have\s+an?\s+issue|i\s+need\s+assistance|can\s+i\s+ask\s+a\s+question)\b',
+        r'^\s*(?:உதவி\s+வேண்டும்|உதவ\s+முடியுமா|எனக்கு\s+ஒரு\s+கேள்வி\s+உள்ளது)\b'
+    ]
+
+    FAREWELL_PATTERNS = [
+        r'^\s*(?:bye|goodbye|bye\s+bye|see\s+you|see\s+ya|talk\s+to\s+you\s+later|take\s+care|have\s+a\s+(?:good|nice|great)\s+day|good\s+night)\b',
+        r'^\s*(?:போய்\s+வருகிறேன்|பை|வணக்கம்\s+மீண்டும்\s+பார்ப்போம்)\b'
+    ]
+
+    AFFIRMATION_PATTERNS = [
+        r'^\s*(?:ok|okay|alright|cool|got\s+it|understood|sure|great|perfect|sounds\s+good|nice|all\s+good)\b',
+        r'^\s*(?:சரி|புரிந்தது|நல்லது)\b'
+    ]
+
+    COMPANY_PATTERNS = [
+        r'\b(?:tell\s+me\s+about\s+(?:the|your)\s+company|what\s+company\s+is\s+this|who\s+is\s+technova|about\s+technova|what\s+is\s+technova|company\s+overview)\b',
+        r'\b(?:what\s+do\s+you\s+sell|what\s+products\s+do\s+you\s+(?:have|sell|offer)|what\s+do\s+you\s+offer|product\s+catalog|list\s+of\s+products|what\s+devices\s+do\s+you\s+have)\b',
+        r'\b(?:என்ன\s+தயாரிப்புகள்|என்ன\s+விற்கிறீர்கள்|தயாரிப்பு\s+பட்டியல்)\b'
     ]
 
     INTENT_KEYWORDS = {
@@ -100,7 +149,6 @@ class IntentDetector:
         # Check pure greeting
         for p in cls.GREETING_PATTERNS:
             if re.search(p, query_lower):
-                # If only greeting words or polite general greeting up to 7 words without specific topic
                 clean_words = re.findall(r'\b\w+\b', query_lower)
                 has_specific_domain = any(
                     re.search(pat, query_lower) 
@@ -116,6 +164,62 @@ class IntentDetector:
                 )
                 if len(clean_words) <= 7 and not has_specific_domain:
                     return ConversationIntent.GREETING, 0.95
+
+        # Check smalltalk wellbeing ("how are you?")
+        for p in cls.WELLBEING_PATTERNS:
+            if re.search(p, query_lower):
+                return ConversationIntent.SMALLTALK_WELLBEING, 0.95
+
+        # Check bot identity ("who are you?", "what is your name?")
+        for p in cls.IDENTITY_PATTERNS:
+            if re.search(p, query_lower):
+                return ConversationIntent.BOT_IDENTITY, 0.95
+
+        # Check bot capabilities ("what can you do?")
+        for p in cls.CAPABILITIES_PATTERNS:
+            if re.search(p, query_lower):
+                return ConversationIntent.BOT_CAPABILITIES, 0.95
+
+        # Check gratitude ("thank you", "thanks")
+        for p in cls.GRATITUDE_PATTERNS:
+            if re.search(p, query_lower):
+                return ConversationIntent.GRATITUDE, 0.95
+
+        # Check farewell ("bye", "goodbye")
+        for p in cls.FAREWELL_PATTERNS:
+            if re.search(p, query_lower):
+                return ConversationIntent.FAREWELL, 0.95
+
+        # Check simple affirmation ("ok", "got it", "cool")
+        for p in cls.AFFIRMATION_PATTERNS:
+            if re.search(p, query_lower):
+                return ConversationIntent.AFFIRMATION, 0.95
+
+        # Check general help request ("can you help me?", "i have a question")
+        for p in cls.HELP_REQUEST_PATTERNS:
+            if re.search(p, query_lower):
+                has_specific_domain = any(
+                    re.search(pat, query_lower) 
+                    for intent in [
+                        ConversationIntent.REFUND, 
+                        ConversationIntent.RETURN, 
+                        ConversationIntent.CANCELLATION,
+                        ConversationIntent.DELIVERY, 
+                        ConversationIntent.WARRANTY, 
+                        ConversationIntent.ORDER_STATUS,
+                        ConversationIntent.PRODUCT_INFO,
+                        ConversationIntent.PAYMENT,
+                        ConversationIntent.ACCOUNT
+                    ] 
+                    for pat in cls.INTENT_KEYWORDS.get(intent, [])
+                )
+                if not has_specific_domain:
+                    return ConversationIntent.HELP_REQUEST, 0.95
+
+        # Check company info ("tell me about your company", "who is technova")
+        for p in cls.COMPANY_PATTERNS:
+            if re.search(p, query_lower):
+                return ConversationIntent.COMPANY_INFO, 0.95
 
         # Check out-of-scope
         for p in cls.OUT_OF_SCOPE_PATTERNS:

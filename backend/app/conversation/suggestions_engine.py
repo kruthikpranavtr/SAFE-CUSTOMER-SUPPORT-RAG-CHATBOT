@@ -14,6 +14,45 @@ class SuggestionsEngine:
             "How long does standard shipping take?",
             "What does the 1-year warranty cover?"
         ],
+        ConversationIntent.SMALLTALK_WELLBEING: [
+            "What is your refund policy?",
+            "How long does standard shipping take?",
+            "What products do you offer?"
+        ],
+        ConversationIntent.BOT_IDENTITY: [
+            "What can you help me with?",
+            "How do I return an item?",
+            "Speak with human support"
+        ],
+        ConversationIntent.BOT_CAPABILITIES: [
+            "Check my order status #Nova-9876",
+            "What is your refund window?",
+            "How long does delivery take?"
+        ],
+        ConversationIntent.GRATITUDE: [
+            "Can I ask another question?",
+            "What are your support hours?",
+            "How do I contact customer support?"
+        ],
+        ConversationIntent.HELP_REQUEST: [
+            "I need help with a refund",
+            "I have an issue with delivery",
+            "How do I claim warranty?"
+        ],
+        ConversationIntent.FAREWELL: [
+            "How do I contact customer support?",
+            "What are your business hours?"
+        ],
+        ConversationIntent.AFFIRMATION: [
+            "What is your return policy?",
+            "What payment methods are supported?",
+            "Contact support"
+        ],
+        ConversationIntent.COMPANY_INFO: [
+            "What products do you offer?",
+            "What is your refund policy?",
+            "What are your customer support hours?"
+        ],
         ConversationIntent.REFUND: [
             "How do I submit a refund request?",
             "What if my item arrived damaged?",

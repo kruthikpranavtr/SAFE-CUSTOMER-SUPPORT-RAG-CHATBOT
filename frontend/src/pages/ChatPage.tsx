@@ -80,6 +80,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastFailedQuery, setLastFailedQuery] = useState<string | null>(null);
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
   const [isDeletingHistory, setIsDeletingHistory] = useState(false);
   
@@ -261,9 +262,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({
     if (!query || isLoading) return;
 
     setError(null);
+    setLastFailedQuery(null);
     setInputValue('');
 
-    // Optimistically add user message
+    // Optimistically add user message, stripping previous unfulfilled temp message if retrying
     const tempUserMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       session_id: currentSessionId || 'pending',
@@ -273,7 +275,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({
       created_at: new Date().toISOString()
     };
 
-    setMessages((prev) => [...prev, tempUserMsg]);
+    setMessages((prev) => {
+      const filtered = prev.filter(m => !m.id.startsWith('temp-'));
+      return [...filtered, tempUserMsg];
+    });
     setIsLoading(true);
 
     try {
@@ -287,6 +292,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
 
       setMessages((prev) => [...prev, aiResponse]);
     } catch (err: any) {
+      setLastFailedQuery(query);
       setError('I’m having trouble generating a response right now. Please try again.');
     } finally {
       setIsLoading(false);
@@ -1017,7 +1023,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({
                 <span>{error}</span>
               </div>
               <button
-                onClick={() => handleSendMessage()}
+                onClick={() => handleSendMessage(lastFailedQuery || undefined)}
                 className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold"
               >
                 Retry

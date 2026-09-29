@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, UserCheck, Send, CheckCircle, AlertTriangle, MessageSquare } from 'lucide-react';
 import { api } from '../services/api';
 import { EscalationInfo } from '../types';
@@ -27,6 +27,14 @@ export const EscalationModal: React.FC<EscalationModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedEscalation, setSubmittedEscalation] = useState<EscalationInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setQuestion(userQuestion);
+      setError(null);
+      setSubmittedEscalation(null);
+    }
+  }, [isOpen, userQuestion]);
 
   if (!isOpen) return null;
 

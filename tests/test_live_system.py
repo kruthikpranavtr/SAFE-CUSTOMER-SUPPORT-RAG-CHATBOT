@@ -3,7 +3,7 @@ import json
 import time
 import io
 
-BASE_BACKEND = "http://127.0.0.1:8001"
+BASE_BACKEND = "http://127.0.0.1:8000"
 BASE_FRONTEND_PROXY = "http://127.0.0.1:5173"
 
 def run_tests():

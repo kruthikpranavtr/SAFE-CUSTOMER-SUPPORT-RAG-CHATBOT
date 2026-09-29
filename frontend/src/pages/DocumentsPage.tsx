@@ -78,7 +78,7 @@ export const DocumentsPage: React.FC = () => {
   };
 
   const handleDelete = async (docId: string, filename: string) => {
-    if (!confirm(`Are you sure you want to remove "${filename}" from the RAG knowledgebase?`)) return;
+    if (!window.confirm(`Are you sure you want to remove "${filename}" from the RAG knowledgebase?`)) return;
 
     try {
       await api.deleteDocument(docId);
